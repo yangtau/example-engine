@@ -9,8 +9,8 @@
 #pragma once
 
 #include <Windows.h>
+#include <inttypes.h>
 #include <string>
-
 ////
 // @brief
 // 管理文件
@@ -21,5 +21,5 @@ private:
 
 public:
   File() : handle_(INVALID_HANDLE_VALUE) {}
-  int create(std::string path, int size);
+  int create(std::string path, uint32_t size);
 };

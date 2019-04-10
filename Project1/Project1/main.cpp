@@ -1,6 +1,10 @@
 #include <iostream>
 
+
 int main() {
-	std::cout << "Hello DataBase!" << std::endl;
+	
+	
+	
+	getchar();
 	return 0;
 }

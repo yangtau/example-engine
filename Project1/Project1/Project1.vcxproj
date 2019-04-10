@@ -119,6 +119,7 @@
     <ClInclude Include="file.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="block.cpp" />
     <ClCompile Include="file.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>

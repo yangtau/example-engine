@@ -9,7 +9,7 @@
 
 #include "file.h"
 
-int File::create(std::string path, int size) {
+int File::create(std::string path, uint32_t size) {
   // CreateFileA
   return 0;
 }
