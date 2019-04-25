@@ -56,7 +56,7 @@ int Block::delRecord(uint32_t position) {
 	uint16_t size = record->header.size + sizeof(RecordHeader);
 	getTailer()->slots[position] = 0;  // pointer to 0
 	// move memory, `offset + size - header.free` is the size to move
-	memmove(record, (uint8_t*)record + size, offset + size - header.free);
+	memmove(record, (uint8_t*)record + size, header.free - offset + size);
 	header.free -= size;
 	// modify offset table (tailer)
 	for (uint16_t i = 0; i < header.count; i++) {
@@ -124,7 +124,7 @@ int Block::updateRecord(uint32_t position, Record* record) {
 	uint16_t offset = getTailer()->slots[position];
 	uint16_t size = old->header.size + sizeof(RecordHeader);
 	// move memory, `offset + size - header.free` is the size to move
-	memmove(old, (uint8_t*)old + size, offset + size - header.free);
+	memmove(old, (uint8_t*)old + size, header.free - offset - size);
 	header.free -= size;
 	// modify offset table (tailer)
 	for (uint16_t i = 0; i < header.count; i++) {

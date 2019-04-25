@@ -73,14 +73,14 @@ public:
 
 	TEST_METHOD(BLOCK_DelRecord) {
 		Block *block = (Block*)malloc(BLOCK_SIZE);
-		char data[10] = { 6, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
-		unsigned size = 6;
+		char data[15] = { 11, 0, 0, 0, 'H', 'e', 'l', 'l', 'o','w','o','r' ,'l','d','\0' };
+		unsigned size = 11;
 		block->header.count = 0;
 		block->header.free = sizeof(BlockHeader);
 		// add record
 		block->header.count = 0;
 		block->header.free = sizeof(BlockHeader);
-		int len = 300;
+		int len = 200;
 		for (int i = 0; i < len; i++) {
 			Assert::AreEqual(1, block->addRecord((Record*)data));
 		}
@@ -100,18 +100,16 @@ public:
 		unsigned size = 6;
 		block->header.count = 0;
 		block->header.free = sizeof(BlockHeader);
-		int len = 250;
+		int len = 200;
 		for (int i = 0; i < len; i++) {
 			Assert::AreEqual(1, block->addRecord((Record*)data));
 		}
-		char newData[] = { 7, 0, 0, 0, 'h', 'i', 'h', 'i','h','i', '\0' };
+		char newData[] = { 8, 0, 0, 0, 'h', 'i', 'h', 'i','h','o','e', '\0' };
 		for (int i = 0; i < len; i++) {
 			Assert::AreEqual(1, block->updateRecord(i, (Record*)newData));
 		}
 		for (int i = 0; i < len; i++) {
-			// check
 			Record * rec = (Record*)block->getRecord(i);
-			//Assert::AreEqual(size, (unsigned)(rec->header.size));
 			Assert::AreEqual(std::string(newData + 4), std::string((char*)rec->getData()));
 		}
 		free(block);
