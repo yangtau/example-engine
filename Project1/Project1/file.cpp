@@ -1,6 +1,12 @@
+////
+// @file file.cpp
+// @brief
+// block
 //
-// Created by Tau on 4/1/2019.
+// @author yangtao
+// @email yangtaojay@gmail.com
 //
+
 
 #include "file.h"
 //#include "stdio.h"
@@ -86,6 +92,3 @@ int File::writeBlock(uint32_t index, Block * block) {
 		return 0;
 	return 1;
 }
-
-// todo: 
-// set free block
