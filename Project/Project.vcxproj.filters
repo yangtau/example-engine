@@ -21,6 +21,9 @@
     <ClInclude Include="file.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="btree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="file.cpp">
@@ -30,6 +33,9 @@
       <Filter>Resource Files</Filter>
     </ClCompile>
     <ClCompile Include="block.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="btree.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
   </ItemGroup>

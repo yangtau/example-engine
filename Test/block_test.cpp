@@ -1,17 +1,17 @@
 ﻿#include "CppUnitTest.h"
 #include "stdafx.h"
-#include "../Project1/file.h"
-#include "../Project1/block.h"
+#include "../Project/file.h"
+#include "../Project/block.h"
 #include <string>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace UnitTest {
-	TEST_CLASS(File_UnitTest) {
+	TEST_CLASS(FileUnitTest) {
 public:
 
 
-	TEST_METHOD(Block_Check) {
+	TEST_METHOD(BlockCheck) {
 		short *buffer = (short*)malloc(BLOCK_SIZE);
 		for (int i = 0; i < BLOCK_SIZE / 2; i++) {
 			srand(i);
@@ -25,7 +25,7 @@ public:
 	}
 
 
-	TEST_METHOD(Block_AddRecord) {
+	TEST_METHOD(BlockAddRecord) {
 		Block *block = (Block*)malloc(BLOCK_SIZE);
 		char data[10] = { 6, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
 		unsigned size = 6;
@@ -49,7 +49,7 @@ public:
 		free(block);
 	}
 
-	TEST_METHOD(BLOCK_GetRecord) {
+	TEST_METHOD(BLOCKGetRecord) {
 		Block *block = (Block*)malloc(BLOCK_SIZE);
 		char data[10] = { 6, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
 		unsigned size = 6;
@@ -71,7 +71,7 @@ public:
 		free(block);
 	}
 
-	TEST_METHOD(BLOCK_DelRecord) {
+	TEST_METHOD(BLOCKDelRecord) {
 		Block *block = (Block*)malloc(BLOCK_SIZE);
 		char data[15] = { 11, 0, 0, 0, 'H', 'e', 'l', 'l', 'o','w','o','r' ,'l','d','\0' };
 		unsigned size = 11;
@@ -94,7 +94,7 @@ public:
 		free(block);
 	}
 
-	TEST_METHOD(BLOCK_UpdateRecord) {
+	TEST_METHOD(BLOCKUpdateRecord) {
 		Block *block = (Block*)malloc(BLOCK_SIZE);
 		char data[10] = { 6, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
 		unsigned size = 6;
@@ -116,24 +116,22 @@ public:
 	}
 
 
-	TEST_METHOD(File_Create) {
+	TEST_METHOD(FileCreate) {
 		File file;
 		int res = file.create("Hello", 20);
 		Assert::AreEqual(res, 1);
 	}
 
-	TEST_METHOD(File_AllocateBlock) {
+	TEST_METHOD(FileAllocateBlock) {
 		File file;
 		int res = file.create("Hello", 20);
 		Assert::AreEqual(res, 1);
 		Block *block = file.allocateBlock(3);
 		int re = block != NULL;
 		Assert::AreEqual(1, re);
-		//Assert::AreEqual(0, (int)block->header.count);
-		//Assert::AreEqual((int)sizeof(BlockHeader), (int)block->header.free);
 	}
 
-	TEST_METHOD(File_WriteBlock) {
+	TEST_METHOD(FileWriteBlock) {
 		File file;
 		int res = file.create("Hello", 20);
 		Assert::AreEqual(res, 1);
