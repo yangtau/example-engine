@@ -1,7 +1,7 @@
 #include <iostream>
-
-
+#include "file.h"
 int main() {
-	
-	return 0;
+    File file;
+    file.create("Hello.db", 32);
+    return 0;
 }

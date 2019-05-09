@@ -1,13 +1,12 @@
 ﻿#include "CppUnitTest.h"
 #include "stdafx.h"
-#include "../Project/file.h"
 #include "../Project/block.h"
 #include <string>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace UnitTest {
-	TEST_CLASS(FileUnitTest) {
+	TEST_CLASS(BlockUnitTest) {
 public:
 
 
@@ -17,7 +16,7 @@ public:
 			srand(i);
 			buffer[i] = (short)rand();
 		}
-		Block *block = (Block*)buffer;
+		RecordBlock *block = (RecordBlock*)buffer;
 		uint16_t checksum = block->header.compute();
 		block->header.checksum = checksum;
 		Assert::AreEqual(1, block->header.check());
@@ -26,7 +25,7 @@ public:
 
 
 	TEST_METHOD(BlockAddRecord) {
-		Block *block = (Block*)malloc(BLOCK_SIZE);
+		RecordBlock *block = (RecordBlock*)malloc(BLOCK_SIZE);
 		char data[10] = { 6, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
 		unsigned size = 6;
 		block->header.count = 0;
@@ -50,7 +49,7 @@ public:
 	}
 
 	TEST_METHOD(BLOCKGetRecord) {
-		Block *block = (Block*)malloc(BLOCK_SIZE);
+		RecordBlock *block = (RecordBlock*)malloc(BLOCK_SIZE);
 		char data[10] = { 6, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
 		unsigned size = 6;
 		block->header.count = 0;
@@ -72,7 +71,7 @@ public:
 	}
 
 	TEST_METHOD(BLOCKDelRecord) {
-		Block *block = (Block*)malloc(BLOCK_SIZE);
+		RecordBlock *block = (RecordBlock*)malloc(BLOCK_SIZE);
 		char data[15] = { 11, 0, 0, 0, 'H', 'e', 'l', 'l', 'o','w','o','r' ,'l','d','\0' };
 		unsigned size = 11;
 		block->header.count = 0;
@@ -95,7 +94,7 @@ public:
 	}
 
 	TEST_METHOD(BLOCKUpdateRecord) {
-		Block *block = (Block*)malloc(BLOCK_SIZE);
+		RecordBlock *block = (RecordBlock*)malloc(BLOCK_SIZE);
 		char data[10] = { 6, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
 		unsigned size = 6;
 		block->header.count = 0;
@@ -113,39 +112,6 @@ public:
 			Assert::AreEqual(std::string(newData + 4), std::string((char*)rec->getData()));
 		}
 		free(block);
-	}
-
-
-	TEST_METHOD(FileCreate) {
-		File file;
-		int res = file.create("Hello", 20);
-		Assert::AreEqual(res, 1);
-	}
-
-	TEST_METHOD(FileAllocateBlock) {
-		File file;
-		int res = file.create("Hello", 20);
-		Assert::AreEqual(res, 1);
-		Block *block = file.allocateBlock(3);
-		int re = block != NULL;
-		Assert::AreEqual(1, re);
-	}
-
-	TEST_METHOD(FileWriteBlock) {
-		File file;
-		int res = file.create("Hello", 20);
-		Assert::AreEqual(res, 1);
-		Block *block = file.allocateBlock(3);
-
-		char data[10] = { 6, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
-		int re = block->addRecord((Record*)data);
-		Assert::AreEqual(re, 1);
-		block->header.next = 0;
-		file.writeBlock(3, block);
-		block = file.allocateBlock(1);
-		block = file.allocateBlock(3);
-		Record * rec = (Record*)block->getRecord(0);
-		Assert::AreEqual(std::string(data + 4), std::string((char*)rec->getData()));
 	}
 
 	};

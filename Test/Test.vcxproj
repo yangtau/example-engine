@@ -114,7 +114,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalLibraryDirectories>C:\Users\qyang\code\db\Project\Debug;$(VCInstallDir)UnitTest\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>file.obj;block.obj;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>file.obj;block.obj;btree.obj;buffer.obj;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -158,6 +158,9 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="btree_test.cpp" />
+    <ClCompile Include="buffer_test.cpp" />
+    <ClCompile Include="file_test.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -167,7 +170,7 @@
     <ClCompile Include="block_test.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Project1\Project1.vcxproj">
+    <ProjectReference Include="..\Project\Project.vcxproj">
       <Project>{01f5e043-4f87-4294-b69a-cbac60e71093}</Project>
     </ProjectReference>
   </ItemGroup>

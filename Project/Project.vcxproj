@@ -118,11 +118,13 @@
   <ItemGroup>
     <ClInclude Include="block.h" />
     <ClInclude Include="btree.h" />
+    <ClInclude Include="buffer.h" />
     <ClInclude Include="file.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="block.cpp" />
     <ClCompile Include="btree.cpp" />
+    <ClCompile Include="buffer.cpp" />
     <ClCompile Include="file.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
