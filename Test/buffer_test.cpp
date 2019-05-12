@@ -13,9 +13,11 @@ public:
         // test free list
         BufferManager manager = BufferManager();
         for (int i = 0; i < 20; i++) {
-            void *t = manager.allocBlock();
+            void *t = manager.allocateBlock();
             Assert::AreEqual(0ul, (unsigned long)t % BLOCK_SIZE);
+            manager.freeBlock(t);
         }
+
     }
     };
 }

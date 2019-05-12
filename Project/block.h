@@ -5,7 +5,7 @@
 //
 // @author yangtao
 // @email yangtaojay@gmail.com
-//
+
 
 #pragma once
 #include <inttypes.h>
@@ -14,7 +14,7 @@
 #define BLOCK_TYPE_DATA 1  // data block
 #define BLOCK_TYPE_META 2  // metadata block
 #define BLOCK_TYPE_LEAF 3  // leaf  block
-#define BLOCK_TYPE_NODE 4  // interior node block
+#define BLOCK_TYPE_NODE 4  // interior node block or root block
 #define BLOCK_TYPE_LOG 5   // log block
 
 #pragma pack(1)
@@ -34,19 +34,20 @@ struct Record {
 // header of block
 // 96
 struct BlockHeader {
-    uint16_t type : 3;  // 块类型
+    uint16_t type : 3;  // type of block
     uint16_t reserved : 13;
-    uint16_t checksum;  // Tcp头部校验
-    uint16_t count;     // 记录数目
-    uint16_t free;      // 空闲块
-    uint32_t next;      // 下一个block的文件偏移量
+    uint16_t checksum;  
+    uint16_t count;     
+    uint16_t free;
+    uint32_t next;      // index of next block
+    uint32_t index;     // index of this block
 
     uint16_t compute();  // compute checksum and set it
     int check();         // check checksum
 };
 
 struct Tailer {
-    uint16_t slots[1];  // 向上增长的记录偏移量数组
+    uint16_t slots[1];  
 };
 
 #pragma pack()

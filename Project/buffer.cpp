@@ -5,6 +5,8 @@
 //
 // @author yangtao
 // @email yangtaojay@gmail.com
+//
+
 #include "buffer.h"
 #include <stdlib.h>
 #include "Windows.h"
@@ -13,18 +15,18 @@
 //    pools = allocPool();
 //}
 
-BufferManager::~BufferManager() {
-    /*while (pools != NULL) {
-        BufferPool* p = pools->next;
-        free(pools);
-        pools = p;
-    }*/
-    while (freeList != NULL) {
-        BufferBlock *p = freeList->next;
-        _aligned_free(freeList);
-        freeList = p;
-    }
-}
+//StorageManager::~StorageManager() {
+//    /*while (pools != NULL) {
+//        BufferPool* p = pools->next;
+//        free(pools);
+//        pools = p;
+//    }*/
+//    while (freeList != NULL) {
+//        BufferBlock *p = freeList->next;
+//        _aligned_free(freeList);
+//        freeList = p;
+//    }
+//}
 
 //BufferPool* BufferManager::allocPool() {
 //    BufferPool* pool = (BufferPool*)malloc(POOL_SIZE);
@@ -42,23 +44,25 @@ BufferManager::~BufferManager() {
 //    return pool;
 //}
 
-void* BufferManager::allocBlock() {
-    if (freeList == NULL) {
-        /*BufferPool *p = allocPool();
-        if (p == NULL) return NULL;
-        p->next = BufferManager::pools;
-        BufferManager::pools = p;*/
-        BufferBlock *p = (BufferBlock *)_aligned_malloc(BLOCK_SIZE, BLOCK_SIZE);
-        if (p != NULL) VirtualLock(p, BLOCK_SIZE);
-        return p;
-    }
-    BufferBlock* t = freeList;
-    freeList = freeList->next;
-    return t;
+void *BufferManager::allocateBlock() {
+//    if (freeList == NULL) {
+//        /*BufferPool *p = allocPool();
+//        if (p == NULL) return NULL;
+//        p->next = BufferManager::pools;
+//        BufferManager::pools = p;*/
+//
+//    }
+//    BufferBlock *t = freeList;
+//    freeList = freeList->next;
+//    return t;
+    void *p = _aligned_malloc(BLOCK_SIZE, BLOCK_SIZE);
+    if (p != NULL) VirtualLock(p, BLOCK_SIZE);
+    return p;
 }
 
-void BufferManager::freeBlock(void* _block) {
-    BufferBlock *block = (BufferBlock *)_block;
-    block->next = freeList;
-    freeList = block;
+void BufferManager::freeBlock(void *_block) {
+//    BufferBlock *block = (BufferBlock *) _block;
+//    block->next = freeList;
+//    freeList = block;
+    _aligned_free(_block);
 }
