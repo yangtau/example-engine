@@ -61,6 +61,14 @@ void * StorageManager::getFreeBlock(uint32_t *index) {
     return b;
 }
 
+void StorageManager::freeBlock(uint32_t index) {
+    RecordBlock *b = (RecordBlock *)readBlock(index);
+
+    b->header.next = meta->free;
+    meta->free = index;
+    meta->idle++;
+}
+
 bool StorageManager::save() {
     for (auto &x : buffers) {
         if (x.second->header.reserved == 1) {

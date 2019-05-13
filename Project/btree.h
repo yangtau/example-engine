@@ -8,6 +8,7 @@
 //
 
 #pragma once
+#define DEBUG_BTREE
 
 #include <inttypes.h>
 #include "block.h"
@@ -30,22 +31,40 @@ struct NodeBlock {
     BlockHeader header;
 
     // The first key is empty, if the block is an interior node
+#ifdef DEBUG_BTREE
     KeyValue kv[4];
+#else
+    KeyValue kv[1];
+#endif // DEBUG_BTREE   
 
     static uint16_t size();
 
-    bool isFull();
+    bool full();
 
-    bool isEmpty();
+    bool empty();
+
+    // equal
+    bool eMin();
+
+    // greater or equal
+    // no need to maintain
+    bool geMin();
 
     ///
     // @brief
-    // the index of first item whose key is bigger than or equal with `key`
+    // return the index of first item whose key is not less than `key`
+    // if keys of all items is less than `key`, return `header.count`
     uint16_t find(uint64_t key);
 
-    bool insert(KeyValue item, uint16_t index);
+    void insert(KeyValue item, uint16_t index);
 
-    void split(NodeBlock* nextNode, uint32_t index);
+    void split(NodeBlock* nextNode);
+
+    void merge(NodeBlock* nextNode);
+
+    bool isLeaf();
+
+    void remove(uint16_t index);
 };
 
 #pragma pack()
@@ -54,15 +73,15 @@ class BTree {
 private:
     StorageManager &storage;
     NodeBlock* root;
-    
+
     //void setRootIndex(uint32_t index);
     KeyValue insert(KeyValue kv, NodeBlock* cur);
-    int remove(KeyValue kv, NodeBlock* cur);
-    int search(KeyValue kv, NodeBlock* cur);
+    void remove(uint64_t key, NodeBlock* cur);
+    KeyValue search(uint64_t key, NodeBlock* cur);
 
 public:
     BTree(StorageManager &s);
     int insert(KeyValue kv);
     int remove(uint64_t key);
-    int search(uint64_t key, uint32_t* value);
+    KeyValue search(uint64_t key);
 };

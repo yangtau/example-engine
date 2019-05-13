@@ -41,6 +41,8 @@ public:
 
     void* getFreeBlock(uint32_t *index);
 
+    void freeBlock(uint32_t index);
+
     bool save();
 
     uint32_t getIndexOfRoot();
