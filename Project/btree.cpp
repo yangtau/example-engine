@@ -77,7 +77,7 @@ void NodeBlock::split(NodeBlock* nextNode) {
 }
 
 void NodeBlock::merge(NodeBlock * nextNode) {
-    memcpy(&kv[0], &nextNode->kv[0], nextNode->header.count);
+    memcpy(&kv[header.count], &nextNode->kv[0], nextNode->header.count * sizeof(KeyValue));
 
     header.count += nextNode->header.count;
 
@@ -135,6 +135,9 @@ int BTree::insert(KeyValue kv) {
         newRoot->kv[1] = r;
         newRoot->kv[0].value = root->header.index;
 
+        //
+        newRoot->kv[0].key = root->kv[0].key;
+
         root = newRoot;
         storage.setIndexOfRoot(newRoot->header.index);
     }
@@ -148,18 +151,25 @@ KeyValue BTree::insert(KeyValue kv, NodeBlock* cur) {
     uint16_t i = cur->find(kv.key);
 
     if (cur->isLeaf()) {
-        cur->insert(kv, i);
+        // no repetition key so far
+        if (kv.key != cur->kv[i].key)
+            cur->insert(kv, i);
+        else
+            cur->kv[i] = kv;
     }
     else {
-        if (cur->kv[i].key > kv.key) {
+        if (cur->kv[i].key > kv.key || i == cur->header.count) {
             i--;
         }
         NodeBlock* t = (NodeBlock*)storage.getBlock(cur->kv[i].value);
         KeyValue r = insert(kv, t);
         if (r.value != 0)
             cur->insert(r, cur->find(r.key));
-    }
 
+        //
+        if (i == 0)
+            cur->kv[i].key = t->kv[0].key;
+    }
 
     if (cur->full()) {
         uint32_t index = 0;
@@ -186,7 +196,7 @@ void BTree::remove(uint64_t key, NodeBlock* cur) {
         }
     }
     else {
-        if (cur->kv[i].key > key) {
+        if (cur->kv[i].key > key || i == cur->header.count) {
             i--;
         }
         NodeBlock* s = (NodeBlock*)storage.getBlock(cur->kv[i].value);
@@ -238,10 +248,11 @@ int BTree::remove(uint64_t key) {
     remove(key, root);
     if (!root->isLeaf() && root->header.count == 1) {
         NodeBlock* s = (NodeBlock*)storage.getBlock(root->kv[0].value);
+        storage.setIndexOfRoot(s->header.index);
+        storage.freeBlock(root->header.index);
         root = s;
-        storage.freeBlock(s->header.index);
     }
-    return 0;
+    return 1;
 }
 
 

@@ -3,6 +3,7 @@
 #include <string>
 #include "../Project/btree.h"
 #include "../Project/storage.h"
+#define DEBUG_BTREE
 
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
@@ -10,28 +11,39 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 namespace UnitTest {
     TEST_CLASS(BPlusTreeUnitTest) {
 public:
-    TEST_METHOD(Test) {
+    TEST_METHOD(insert) {
         StorageManager s = StorageManager("btree-test.db");
         BTree btree = BTree(s);
-        KeyValue kv;
-        kv.key = 20;
-        kv.value = 300;
-        btree.insert(kv);
+        KeyValue kvs[12] = {
+            {20, 200}, {10, 200}, {15, 200},
+            {30, 900}, {80, 300}, {60, 200},
+            {70, 110}, {0, 900}, {5, 700},
+            {22, 300}, {45, 300}, {25, 100}
+        };
 
-        kv.key = 10;
-        btree.insert(kv);
+        for (auto &i : kvs) {
+            Assert::AreEqual(1, btree.insert(i));
+        }
+        Assert::AreEqual(1, btree.insert(kvs[11]));
+    }
 
-        kv.key = 30;
-        btree.insert(kv);
+    TEST_METHOD(remove) {
+        StorageManager s = StorageManager("btree-test.db");
+        BTree btree = BTree(s);
 
-        kv.key = 15;
-        btree.insert(kv);
+        KeyValue kvs[12] = {
+            {20, 200}, {10, 200}, {15, 200},
+            {30, 900}, {80, 300}, {60, 200},
+            {70, 110}, {0, 900}, {5, 700},
+            {22, 300}, {45, 300}, {25, 100}
+        };
 
-        kv.key = 80;
-        btree.insert(kv);
-
-        kv.key = 70;
-        btree.insert(kv);
+        for (auto &i : kvs) {
+            Assert::AreEqual(1, btree.insert(i));
+        }
+        for (auto &i : kvs) {
+            Assert::AreEqual(1, btree.remove(i.key));
+        }
     }
     };
 }

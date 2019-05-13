@@ -30,7 +30,13 @@ StorageManager::~StorageManager() {
 }
 
 void *StorageManager::getBlock(uint32_t index) {
-    RecordBlock *block = (RecordBlock *)readBlock(index);
+    RecordBlock *block = buffers[index];
+    if (block == NULL || block->header.index != index) {
+        block = (RecordBlock*)bufferManager.allocateBlock();
+        if (!file.readBlock(index, block))
+            return NULL;
+        buffers[index] = block;
+    }
     if (block != NULL) block->header.reserved = 1;
     return block;
 }
@@ -46,12 +52,14 @@ const void * StorageManager::readBlock(uint32_t  index) {
     return block;
 }
 
+// TODO: remove `index`
 void * StorageManager::getFreeBlock(uint32_t *index) {
     if (meta->idle == 0 || meta->free == 0)
         return 0;
     RecordBlock *b = (RecordBlock *)readBlock(meta->free);
     if (b == NULL) return NULL;
     if (index != NULL) *index = meta->free;
+    b->header.reserved = 1;
 
     // remove from free list
     meta->free = b->header.next;
