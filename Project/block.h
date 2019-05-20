@@ -26,7 +26,8 @@ struct RecordHeader {
 
 struct Record {
     RecordHeader header;
-    uint8_t* getData();
+    //uint8_t* getData();
+    uint8_t data[1];
 };
 
 /// 
@@ -34,6 +35,7 @@ struct Record {
 // header of block
 // 96
 struct BlockHeader {
+    uint32_t magic = 0xc1c6f01e;
     uint16_t type : 3;  // type of block
     uint16_t reserved : 13;
     uint16_t checksum;  
@@ -64,13 +66,15 @@ struct RecordBlock {
 
     void init();
 
-    int addRecord(Record* record);
+    int addRecord(Record* record, uint32_t *position);
 
     int delRecord(uint32_t position);
 
     Record* getRecord(uint32_t position);
 
     int updateRecord(uint32_t position, Record* record);
+
+    bool full();
 };
 
 ///

@@ -17,7 +17,7 @@
 
 ///
 // @brief
-// buffer manager
+// storage manager
 class StorageManager {
 private:
     // `header.reserved` is used as a flag indicating whether the buffer is clean

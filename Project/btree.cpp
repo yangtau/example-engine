@@ -240,9 +240,25 @@ void BTree::remove(uint64_t key, NodeBlock* cur) {
     }
 }
 
+void BTree::removeByMark(uint64_t key, NodeBlock * cur) {
+    if (cur->empty()) {
+        return;
+    }
+    uint16_t i = cur->find(key);
+    if (cur->isLeaf()) {
+        if (cur->kv[i].key == key)
+            cur->kv[i].value = 0;
+    }
+    else {
+        if (cur->kv[i].key > key || i == cur->header.count) i--;
+        NodeBlock* s = (NodeBlock*)storage.getBlock(cur->kv[i].value);
+        return removeByMark(key, s);
+    }
+}
+
 
 int BTree::remove(uint64_t key) {
-    if (root->empty()) {
+    /*if (root->empty()) {
         return 0;
     }
     remove(key, root);
@@ -251,20 +267,27 @@ int BTree::remove(uint64_t key) {
         storage.setIndexOfRoot(s->header.index);
         storage.freeBlock(root->header.index);
         root = s;
-    }
+    }*/
+
+    removeByMark(key, root);
     return 1;
 }
 
 
 KeyValue BTree::search(uint64_t key, NodeBlock* cur) {
+    if (cur->empty()) {
+        KeyValue res;
+        res.value = 0;
+        return res;
+    }
     uint16_t i = cur->find(key);
     if (cur->isLeaf()) {
         if (cur->kv[i].key == key)
             return cur->kv[i];
     }
     else {
-        if (cur->kv[i].key > key) i--;
-        NodeBlock* s = (NodeBlock*)storage.getBlock(root->kv[i].value);
+        if (cur->kv[i].key > key || i == cur->header.count) i--;
+        NodeBlock* s = (NodeBlock*)storage.getBlock(cur->kv[i].value);
         return search(key, s);
     }
     KeyValue res;
@@ -275,4 +298,65 @@ KeyValue BTree::search(uint64_t key, NodeBlock* cur) {
 
 KeyValue BTree::search(uint64_t key) {
     return search(key, root);
+}
+
+std::vector<KeyValue> BTree::search(uint64_t lo, uint64_t hi) {
+    NodeBlock *cur = root;
+    std::vector<KeyValue> res;
+    if (root->empty()) return res;
+    while (!cur->isLeaf()) {
+        uint16_t i = cur->find(lo);
+        if (cur->kv[i].key > lo || i == cur->header.count) i--;
+        cur = (NodeBlock*)storage.getBlock(cur->kv[i].value);
+    }
+    while (cur->isLeaf()) {
+        uint16_t i = cur->find(lo);
+        for (; i < cur->header.count; i++) {
+            if (cur->kv[i].key >= lo && cur->kv[i].key <= hi)
+                res.push_back(cur->kv[i]);
+        }
+        if (cur->header.next == 0 || cur->kv[i].key > hi) break;
+        cur = (NodeBlock*)storage.getBlock(cur->header.next);
+    }
+    return res;
+}
+
+std::vector<KeyValue> BTree::lower(uint64_t lo) {
+    NodeBlock *cur = root;
+    std::vector<KeyValue> res;
+    if (root->empty()) return res;
+    while (!cur->isLeaf()) {
+        uint16_t i = cur->find(lo);
+        if (cur->kv[i].key > lo || i == cur->header.count) i--;
+        cur = (NodeBlock*)storage.getBlock(cur->kv[i].value);
+    }
+    while (cur->isLeaf()) {
+        uint16_t i = cur->find(lo);
+        for (; i < cur->header.count; i++) {
+            if (cur->kv[i].key >= lo)
+                res.push_back(cur->kv[i]);
+        }
+        if (cur->header.next == 0) break;
+        cur = (NodeBlock*)storage.getBlock(cur->header.next);
+    }
+    return res;
+}
+
+std::vector<KeyValue> BTree::upper(uint64_t hi) {
+    NodeBlock *cur = root;
+    std::vector<KeyValue> res;
+    if (root->empty()) return res;
+    while (!cur->isLeaf()) {
+        cur = (NodeBlock*)storage.getBlock(cur->kv[0].value);
+    }
+    while (cur->isLeaf()) {
+        uint16_t i = 0;
+        for (; i < cur->header.count; i++) {
+            if (cur->kv[i].key <= hi)
+                res.push_back(cur->kv[i]);
+        }
+        if (cur->header.next == 0 || cur->kv[i].key > hi) break;
+        cur = (NodeBlock*)storage.getBlock(cur->header.next);
+    }
+    return res;
 }

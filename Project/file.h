@@ -38,4 +38,6 @@ public:
 
     // write `block` to file
     bool writeBlock(uint32_t index, void* block);
+
+    bool resize(uint32_t num);
 };

@@ -33,7 +33,7 @@ public:
 		// add multi records
 		int len = 300;
 		for (int i = 0; i < len; i++) {
-			Assert::AreEqual(1, block->addRecord((Record*)data));
+			Assert::AreEqual(1, block->addRecord((Record*)data, NULL));
 		}
 		// count
 		Assert::AreEqual(len, (int)block->header.count);
@@ -59,13 +59,13 @@ public:
 		block->header.free = sizeof(BlockHeader);
 		int len = 300;
 		for (int i = 0; i < len; i++) {
-			Assert::AreEqual(1, block->addRecord((Record*)data));
+			Assert::AreEqual(1, block->addRecord((Record*)data, NULL));
 		}
 		for (int i = 0; i < len; i++) {
 			// check
 			Record * rec = (Record*)block->getRecord(i);
 			Assert::AreEqual(size, (unsigned)(rec->header.size));
-			Assert::AreEqual(std::string(data + 4), std::string((char*)rec->getData()));
+			Assert::AreEqual(std::string(data + 4), std::string((char*)rec->data));
 		}
 		free(block);
 	}
@@ -81,7 +81,7 @@ public:
 		block->header.free = sizeof(BlockHeader);
 		int len = 200;
 		for (int i = 0; i < len; i++) {
-			Assert::AreEqual(1, block->addRecord((Record*)data));
+			Assert::AreEqual(1, block->addRecord((Record*)data, NULL));
 		}
 		for (int i = 0; i < len; i++) {
 			Assert::AreEqual(1, block->delRecord(i));
@@ -101,7 +101,7 @@ public:
 		block->header.free = sizeof(BlockHeader);
 		int len = 200;
 		for (int i = 0; i < len; i++) {
-			Assert::AreEqual(1, block->addRecord((Record*)data));
+			Assert::AreEqual(1, block->addRecord((Record*)data, NULL));
 		}
 		char newData[] = { 8, 0, 0, 0, 'h', 'i', 'h', 'i','h','o','e', '\0' };
 		for (int i = 0; i < len; i++) {
@@ -109,7 +109,7 @@ public:
 		}
 		for (int i = 0; i < len; i++) {
 			Record * rec = (Record*)block->getRecord(i);
-			Assert::AreEqual(std::string(newData + 4), std::string((char*)rec->getData()));
+			Assert::AreEqual(std::string(newData + 4), std::string((char*)rec->data));
 		}
 		free(block);
 	}

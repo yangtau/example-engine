@@ -9,6 +9,13 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 namespace UnitTest {
     TEST_CLASS(StorageUnitTest) {
 public:
+    TEST_METHOD(getFreeBlock) {
+        StorageManager s = StorageManager("storage-test.db");
+        for (int i = 0; i < 2 * 64; i++)
+            Assert::IsNotNull(s.getFreeBlock(NULL));
+
+    }
+
     TEST_METHOD(getBlock) {
         StorageManager s = StorageManager("storage-test.db");
 

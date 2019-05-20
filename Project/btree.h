@@ -11,6 +11,7 @@
 #define DEBUG_BTREE
 
 #include <inttypes.h>
+#include <vector>
 #include "block.h"
 #include "storage.h"
 
@@ -22,6 +23,7 @@
 struct KeyValue {
     uint64_t key;
     uint32_t value;
+    uint32_t position;
 };
 
 ///
@@ -77,6 +79,7 @@ private:
     //void setRootIndex(uint32_t index);
     KeyValue insert(KeyValue kv, NodeBlock* cur);
     void remove(uint64_t key, NodeBlock* cur);
+    void removeByMark(uint64_t key, NodeBlock* cur);
     KeyValue search(uint64_t key, NodeBlock* cur);
 
 public:
@@ -84,4 +87,7 @@ public:
     int insert(KeyValue kv);
     int remove(uint64_t key);
     KeyValue search(uint64_t key);
+    std::vector<KeyValue> search(uint64_t lo, uint64_t hi);
+    std::vector<KeyValue> lower(uint64_t lo);
+    std::vector<KeyValue> upper(uint64_t hi);
 };

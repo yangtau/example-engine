@@ -105,6 +105,11 @@ bool File::writeBlock(uint32_t index, void *_block) {
 //    bufferManager.freeBlock(block);
 }
 
+bool File::resize(uint32_t num) {
+    return SetFilePointer(handle, BLOCK_SIZE * num, NULL, FILE_BEGIN) &&
+        SetEndOfFile(handle);
+}
+
 //uint32_t File::getIndexOfRoot() {
 //    return meta->root;
 //}

@@ -54,8 +54,23 @@ const void * StorageManager::readBlock(uint32_t  index) {
 
 // TODO: remove `index`
 void * StorageManager::getFreeBlock(uint32_t *index) {
-    if (meta->idle == 0 || meta->free == 0)
-        return 0;
+    if (meta->idle == 0 || meta->free == 0) {
+        meta->count *= 2;
+        file.resize(meta->count);
+
+        // free block list
+        for (uint32_t i = meta->count / 2; i < meta->count; i++) {
+            RecordBlock *block = (RecordBlock*)getBlock(i);
+            if (block == NULL) return false;
+            block->header.magic = 0xc1c6f01e;
+            block->header.index = i;
+            block->header.type = BLOCK_TYPE_FREE;
+            // add to free lsit
+            block->header.next = meta->free;
+            meta->free = i;
+        }
+        //save();
+    }
     RecordBlock *b = (RecordBlock *)readBlock(meta->free);
     if (b == NULL) return NULL;
     if (index != NULL) *index = meta->free;
@@ -101,6 +116,7 @@ bool StorageManager::initFile() {
     meta = (MetaBlock*)getBlock(0);
     if (meta == NULL) return false;
 
+    meta->header.magic = 0xc1c6f01e;
     // init metadata block
     meta->header.type = BLOCK_TYPE_META;
     meta->header.index = 0;
@@ -114,6 +130,7 @@ bool StorageManager::initFile() {
     for (uint32_t i = 1; i < NUM_BLOCK; i++) {
         RecordBlock *block = (RecordBlock*)getBlock(i);
         if (block == NULL) return false;
+        block->header.magic = 0xc1c6f01e;
         block->header.index = i;
         block->header.type = BLOCK_TYPE_FREE;
         // add to free lsit
@@ -121,5 +138,6 @@ bool StorageManager::initFile() {
         meta->free = i;
     }
 
-    return save();
+    return true;
+    //return save();
 }
