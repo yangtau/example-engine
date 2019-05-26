@@ -14,4 +14,6 @@ add_executable(Project
         storage.h
         file.cpp
         file.h
-        main.cpp buffer.cpp buffer.h)
+        buffer.cpp buffer.h
+        matu.h
+        main.cpp)

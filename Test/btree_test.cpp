@@ -3,7 +3,7 @@
 #include <string>
 #include "../Project/btree.h"
 #include "../Project/storage.h"
-#define DEBUG_BTREE
+//#define DEBUG_BTREE
 
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;

@@ -6,10 +6,10 @@
 // @author yangtao
 // @email yangtaojay@gmail.com
 //
-
-#include "buffer.h"
 #include <stdlib.h>
+#include "buffer.h"
 #include "Windows.h"
+#include "block.h"
 
 //BufferManager::BufferManager() : freeList(NULL) {
 //    pools = allocPool();

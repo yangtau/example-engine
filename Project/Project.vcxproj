@@ -120,6 +120,7 @@
     <ClInclude Include="btree.h" />
     <ClInclude Include="buffer.h" />
     <ClInclude Include="file.h" />
+    <ClInclude Include="matu.h" />
     <ClInclude Include="storage.h" />
   </ItemGroup>
   <ItemGroup>
@@ -128,7 +129,6 @@
     <ClCompile Include="buffer.cpp" />
     <ClCompile Include="file.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Source.cpp" />
     <ClCompile Include="storage.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

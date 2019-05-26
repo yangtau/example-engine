@@ -30,6 +30,9 @@
     <ClInclude Include="storage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="matu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="file.cpp">
@@ -48,9 +51,6 @@
       <Filter>Resource Files</Filter>
     </ClCompile>
     <ClCompile Include="storage.cpp">
-      <Filter>Resource Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Source.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
   </ItemGroup>

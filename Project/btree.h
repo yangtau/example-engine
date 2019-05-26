@@ -8,7 +8,6 @@
 //
 
 #pragma once
-#define DEBUG_BTREE
 
 #include <inttypes.h>
 #include <vector>
@@ -37,7 +36,7 @@ struct NodeBlock {
     KeyValue kv[4];
 #else
     KeyValue kv[1];
-#endif // DEBUG_BTREE   
+#endif  // DEBUG_BTREE
 
     static uint16_t size();
 
@@ -72,22 +71,25 @@ struct NodeBlock {
 #pragma pack()
 
 class BTree {
-private:
-    StorageManager &storage;
+   private:
+    StorageManager& storage;
     NodeBlock* root;
 
-    //void setRootIndex(uint32_t index);
+    // void setRootIndex(uint32_t index);
     KeyValue insert(KeyValue kv, NodeBlock* cur);
     void remove(uint64_t key, NodeBlock* cur);
     void removeByMark(uint64_t key, NodeBlock* cur);
     KeyValue search(uint64_t key, NodeBlock* cur);
 
-public:
-    BTree(StorageManager &s);
+   public:
+    BTree(StorageManager& s);
     int insert(KeyValue kv);
     int remove(uint64_t key);
     KeyValue search(uint64_t key);
     std::vector<KeyValue> search(uint64_t lo, uint64_t hi);
+    // [lo, +)
     std::vector<KeyValue> lower(uint64_t lo);
+    // (-, hi]
     std::vector<KeyValue> upper(uint64_t hi);
+    std::vector<KeyValue> values();
 };

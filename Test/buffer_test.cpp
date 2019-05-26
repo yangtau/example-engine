@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include <string>
 #include "../Project/buffer.h"
+#include "../Project/block.h"
 
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
