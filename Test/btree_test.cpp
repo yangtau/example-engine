@@ -3,7 +3,7 @@
 #include <string>
 #include "../Project/btree.h"
 #include "../Project/storage.h"
-//#define DEBUG_BTREE
+#define DEBUG_BTREE
 
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
@@ -43,6 +43,9 @@ public:
         }
         for (auto &i : kvs) {
             Assert::AreEqual(1, btree.remove(i.key));
+        }
+        for (auto &i : kvs) {
+            Assert::AreEqual(0u, btree.search(i.key).value);
         }
     }
 

@@ -45,22 +45,22 @@ struct NodeBlock {
     bool empty();
 
     // equal
-    bool eMin();
+    bool eqMin();
 
     // greater or equal
     // no need to maintain
     bool geMin();
 
-    ///
-    // @brief
     // return the index of first item whose key is not less than `key`
     // if keys of all items is less than `key`, return `header.count`
     uint16_t find(uint64_t key);
 
     void insert(KeyValue item, uint16_t index);
 
+
     void split(NodeBlock* nextNode);
 
+    // merge `nextNode` with this
     void merge(NodeBlock* nextNode);
 
     bool isLeaf();
@@ -75,14 +75,14 @@ class BTree {
     StorageManager& storage;
     NodeBlock* root;
 
-    // void setRootIndex(uint32_t index);
-    KeyValue insert(KeyValue kv, NodeBlock* cur);
+    bool insert(KeyValue kv, NodeBlock* cur);
+//    KeyValue insert(KeyValue kv, NodeBlock* cur);
     void remove(uint64_t key, NodeBlock* cur);
-    void removeByMark(uint64_t key, NodeBlock* cur);
-    KeyValue search(uint64_t key, NodeBlock* cur);
+    bool removeByMark(uint64_t key, NodeBlock* cur);
+    //KeyValue search(uint64_t key, NodeBlock* cur);
 
    public:
-    BTree(StorageManager& s);
+    explicit BTree(StorageManager& s);
     int insert(KeyValue kv);
     int remove(uint64_t key);
     KeyValue search(uint64_t key);

@@ -31,7 +31,7 @@ private:
 
     bool initFile();
 public:
-    StorageManager(const char *path);
+    explicit StorageManager(const char *path);
 
     ~StorageManager();
 
@@ -39,7 +39,7 @@ public:
 
     const void *readBlock(uint32_t index);
 
-    void* getFreeBlock(uint32_t *index);
+    void* getFreeBlock();
 
     void freeBlock(uint32_t index);
 

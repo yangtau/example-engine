@@ -10,10 +10,24 @@ namespace UnitTest {
     TEST_CLASS(StorageUnitTest) {
 public:
     TEST_METHOD(getFreeBlock) {
-        StorageManager s = StorageManager("storage-test.db");
-        for (int i = 0; i < 2 * 64; i++)
-            Assert::IsNotNull(s.getFreeBlock(NULL));
+        StorageManager s = StorageManager("storage-freeblock.db");
+        RecordBlock *block = (RecordBlock*)s.getFreeBlock();
+        Assert::IsNotNull(block);
+        Assert::AreEqual(block->header.index, 1u);
 
+        block = (RecordBlock*)s.getFreeBlock();
+        Assert::IsNotNull(block);
+        Assert::AreEqual(block->header.index, 2u);
+
+        s.freeBlock(block->header.index);
+
+        block = (RecordBlock*)s.getFreeBlock();
+        Assert::IsNotNull(block);
+        Assert::AreEqual(block->header.index, 2u);
+
+        block = (RecordBlock*)s.getFreeBlock();
+        Assert::IsNotNull(block);
+        Assert::AreEqual(block->header.index, 3u);
     }
 
     TEST_METHOD(getBlock) {
@@ -23,10 +37,16 @@ public:
 
     }
 
+    TEST_METHOD(resize) {
+        StorageManager s = StorageManager("storage-test.db");
+        for (int i = 0; i < 2 * 64; i++)
+            Assert::IsNotNull(s.getFreeBlock());
+    }
+
     TEST_METHOD(save) {
         StorageManager s = StorageManager("storage-test.db");
-        uint32_t index = 0;
-        RecordBlock *block = (RecordBlock *)s.getFreeBlock(&index);
+        //uint32_t index = 0;
+        RecordBlock *block = (RecordBlock *)s.getFreeBlock();
         Assert::IsNotNull(block);
 
         char data[10] = { 6, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', '\0' };

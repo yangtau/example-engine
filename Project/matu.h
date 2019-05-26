@@ -376,39 +376,73 @@ static BTree bTree(st);
 static RecordBlock* block = NULL;
 void initial() {}
 
-void insert(std::vector<RowData> rows) {
+void insert(RowData &data) {
     if (block == NULL) {
         if (s.getIndexOfRoot() == 0) {
-            block = (RecordBlock*)s.getFreeBlock(NULL);
+            block = (RecordBlock*)s.getFreeBlock();
             block->init();
             s.setIndexOfRoot(block->header.index);
         }
         else
             block = (RecordBlock*)s.getBlock(s.getIndexOfRoot());
     }
-    for (auto& r : rows) {
-        if (bTree.search(r.id).value != 0) {
-            continue;
-        }
-        uint32_t pos = 0;
-        Record* rcd = encode(r);
+
+    uint32_t pos = 0;
+    Record* rcd = encode(data);
+    if (!block->addRecord(rcd, &pos)) {
+        RecordBlock* newBlock = (RecordBlock*)s.getFreeBlock();
+        newBlock->init();
+
+        block->header.next = newBlock->header.index;
+        block = newBlock;
+
+        s.setIndexOfRoot(block->header.index);
+
         if (!block->addRecord(rcd, &pos)) {
-            RecordBlock* newBlock = (RecordBlock*)s.getFreeBlock(NULL);
-            newBlock->init();
-
-            block->header.next = newBlock->header.index;
-            block = newBlock;
-
-            s.setIndexOfRoot(block->header.index);
-
-            if (!block->addRecord(encode(r), &pos)) {
-                // TODO:
-            }
+            // TODO:
         }
-        free(rcd);
-        KeyValue kv;
-        kv.key = r.id, kv.value = block->header.index, kv.position = pos;
-        bTree.insert(kv);
+    }
+    free(rcd);
+    KeyValue kv ={data.id, block->header.index, pos};
+    //kv.key = r.id, kv.value = block->header.index, kv.position = pos;
+    bTree.insert(kv);
+
+}
+
+void insert(std::vector<RowData> rows) {
+    //if (block == NULL) {
+    //    if (s.getIndexOfRoot() == 0) {
+    //        block = (RecordBlock*)s.getFreeBlock();
+    //        block->init();
+    //        s.setIndexOfRoot(block->header.index);
+    //    }
+    //    else
+    //        block = (RecordBlock*)s.getBlock(s.getIndexOfRoot());
+    //}
+    for (auto& r : rows) {
+        //if (bTree.search(r.id).value != 0) {
+        //    continue;
+        //}
+        //uint32_t pos = 0;
+        //Record* rcd = encode(r);
+        //if (!block->addRecord(rcd, &pos)) {
+        //    RecordBlock* newBlock = (RecordBlock*)s.getFreeBlock();
+        //    newBlock->init();
+
+        //    block->header.next = newBlock->header.index;
+        //    block = newBlock;
+
+        //    s.setIndexOfRoot(block->header.index);
+
+        //    if (!block->addRecord(encode(r), &pos)) {
+        //        // TODO:
+        //    }
+        //}
+        //free(rcd);
+        //KeyValue kv;
+        //kv.key = r.id, kv.value = block->header.index, kv.position = pos;
+        //bTree.insert(kv);
+        insert(r);
     }
 }
 
@@ -430,8 +464,14 @@ vector<KeyValue> search(const string& sql) {
             r.push_back(i);
         break;
     case RES_EQ_BOTH:
-        r.push_back(bTree.search(con.a));
-        r.push_back(bTree.search(con.b));
+        if (con.a > con.b) {
+            r.push_back(bTree.search(con.b));
+            r.push_back(bTree.search(con.a));
+        }
+        else {
+            r.push_back(bTree.search(con.a));
+            r.push_back(bTree.search(con.b));
+        }
         break;
     case RES_EQ_FIRST:
         r.push_back(bTree.search(con.a));
@@ -442,7 +482,8 @@ vector<KeyValue> search(const string& sql) {
         break;
     case RES_EQ_LO:
         r = bTree.lower(con.b);
-        r.push_back(bTree.search(con.a));
+        //r.push_back(bTree.search(con.a));
+        r.insert(r.begin(), bTree.search(con.a));
         break;
     case RES_HI:
         r = bTree.upper(con.a);
@@ -562,7 +603,10 @@ void update(string sql) {
             t.email = mail;
         }
         Record *r = encode(t);
-        rb->updateRecord(i.position, r);
+        if (!rb->updateRecord(i.position, r)) {
+            // 插入失败 空间不足
+            insert(t);
+        }
         free(r);
     }
 }
@@ -609,7 +653,7 @@ void test() {
 }
 
 void test1() {
-    for (int i = 0; i < 8888; i++) {
+    for (int i = 0; i <= 8888; i++) {
         vector<RowData> rowDatas;
         RowData rowData;
         rowData.id = i;
@@ -627,6 +671,7 @@ void test1() {
     for (int i = 501; i < 999; i++) {  //保证数据顺序性
         RowData rowData = result.front();
         result.erase(result.begin());
+        //RowData rowData = result[i - 501];
         if (rowData.id != i) {
             flag = false;
             break;
@@ -650,6 +695,25 @@ void test1() {
             break;
         }
     }
+    // 0~8888
+    del("delete from table where id < 300 or id > 7999");
+    // 300 ~ 8000
+    result =
+        query("select * from table where id < 300 or id >7999");
+    if (result.size() != 0) flag = false;
+
+    update("update table set email = yangtao@mail.com where id=900 or id>=7000");
+
+    result = query("select * from table where id=900 or id>=7000");
+
+    for (RowData &data : result) {
+        if (data.email.compare(string("yangtao@mail.com")) != 0) {
+            flag = false;
+            break;
+        }
+    }
+    
+
     if (flag) {
         std::cout << "Yes!!!\n";
     }

@@ -6,7 +6,6 @@
 // @author yangtao
 // @email yangtaojay@gmail.com
 
-
 #pragma once
 #include <inttypes.h>
 // Block type
@@ -17,6 +16,8 @@
 #define BLOCK_TYPE_NODE 4  // interior node block or root block
 #define BLOCK_TYPE_LOG 5   // log block
 
+#define MAGIC_NUM 0xc1c6f01e
+
 #pragma pack(1)
 
 struct RecordHeader {
@@ -26,30 +27,30 @@ struct RecordHeader {
 
 struct Record {
     RecordHeader header;
-    //uint8_t* getData();
+    // uint8_t* getData();
     uint8_t data[1];
 };
 
-/// 
+///
 // @brief
 // header of block
 // 96
 struct BlockHeader {
-    uint32_t magic = 0xc1c6f01e;
+    uint32_t magic;
     uint16_t type : 3;  // type of block
     uint16_t reserved : 13;
-    uint16_t checksum;  
-    uint16_t count;     
+    uint16_t checksum;
+    uint16_t count;
     uint16_t free;
-    uint32_t next;      // index of next block
-    uint32_t index;     // index of this block
+    uint32_t next;   // index of next block
+    uint32_t index;  // index of this block
 
     uint16_t compute();  // compute checksum and set it
     int check();         // check checksum
 };
 
 struct Tailer {
-    uint16_t slots[1];  
+    uint16_t slots[1];
 };
 
 #pragma pack()
@@ -66,7 +67,7 @@ struct RecordBlock {
 
     void init();
 
-    int addRecord(Record* record, uint32_t *position);
+    int addRecord(Record* record, uint32_t* position);
 
     int delRecord(uint32_t position);
 
@@ -82,8 +83,8 @@ struct RecordBlock {
 // metadata blcok
 struct MetaBlock {
     BlockHeader header;
-    uint32_t free; // list of free block
-    uint32_t root; // root of b+tree
-    uint32_t count; // num of blocks
-    uint32_t idle; // num of idle blocks
+    uint32_t free;      // the index of first free block
+    uint32_t root;      // root of b+tree
+    uint32_t count;     // num of blocks
+    uint32_t freeList;  // list of free block, 0 indicate no free block
 };
