@@ -10,9 +10,6 @@
 #include "block.h"
 #include <cstring>
 
-//uint8_t* Record::getData() {
-//    return (uint8_t*)this + sizeof(RecordHeader);
-//}
 
 uint16_t BlockHeader::compute() {
     // the max sum 4094/2 * 2^16 < 2^32

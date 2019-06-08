@@ -9,20 +9,25 @@
 #include "storage.h"
 #include <assert.h>
 
-static const uint32_t NUM_BLOCK = 64;
+static const uint32_t NUM_BLOCK = 16;
 
 StorageManager::StorageManager(const char* path) : meta(NULL) {
     int res = file.create(path, NUM_BLOCK);
     if (res == 0) {
         // TODO: failed to create file
-    } else if (res == 1) {
-        initFile();
+    }
+    else if (res == 1) {
+        if (!initFile()) {
+            //TODO: error
+        }
     }
     meta = (MetaBlock*)getBlock(0);
 }
 
 StorageManager::~StorageManager() {
-    save();
+    if (!save()) {
+        exit(1);
+    }
     for (auto& x : buffers) {
         bufferManager.freeBlock(x.second);
     }
@@ -62,18 +67,18 @@ void* StorageManager::getFreeBlock() {
         }
 
         // free block list
-        // for (uint32_t i = meta->count / 2; i < meta->count; i++) {
-        //     RecordBlock* block = (RecordBlock*)getBlock(i);
-        //     if (block == NULL)
-        //         return NULL;
-        //     block->header.magic = 0xc1c6f01e;
-        //     block->header.index = i;
-        //     block->header.type = BLOCK_TYPE_FREE;
-        //     // add to free lsit
-        //     block->header.next = meta->free;
-        //     meta->free = i;
-        // }
-        // save();
+        for (uint32_t i = meta->count / 2; i < meta->count; i++) {
+            RecordBlock* block = (RecordBlock*)getBlock(i);
+            if (block == NULL)
+                return NULL;
+            block->header.magic = MAGIC_NUM;
+            block->header.index = i;
+            block->header.type = BLOCK_TYPE_FREE;
+
+        }
+        if (!save()) {
+            fprintf(stderr, "write file failed");
+        }
     }
 
     RecordBlock* b = NULL;
@@ -82,8 +87,9 @@ void* StorageManager::getFreeBlock() {
         b = (RecordBlock*)readBlock(meta->freeList);
         if (b != NULL)
             meta->freeList = b->header.next;
-    } else {
-         b = (RecordBlock*)readBlock(meta->free);
+    }
+    else {
+        b = (RecordBlock*)readBlock(meta->free);
         if (b != NULL) {
             b->header.index = meta->free;
             meta->free++;
@@ -94,27 +100,13 @@ void* StorageManager::getFreeBlock() {
     b->header.magic = MAGIC_NUM;
     b->header.reserved = 1;
     b->header.next = 0;
-
-    // RecordBlock* b = (RecordBlock*)readBlock(meta->free);
-    // if (b == NULL)
-    //     return NULL;
-    // //    if (index != NULL) *index = meta->free;
-    // b->header.reserved = 1;
-
-    // // remove from free list
-    // meta->free = b->header.next;
-    // meta->idle--;
-    // b->header.next = 0;
-
     return b;
 }
 
 void StorageManager::freeBlock(uint32_t index) {
     RecordBlock* b = (RecordBlock*)readBlock(index);
-
     b->header.next = meta->freeList;
     meta->freeList = index;
-    // meta->idle++;
 }
 
 bool StorageManager::save() {
@@ -142,8 +134,7 @@ bool StorageManager::initFile() {
     if (meta == NULL)
         return false;
 
-    meta->header.magic = 0xc1c6f01e;
-    // init metadata block
+    meta->header.magic = MAGIC_NUM;
     meta->header.type = BLOCK_TYPE_META;
     meta->header.index = 0;
     meta->header.next = 0;
@@ -151,20 +142,15 @@ bool StorageManager::initFile() {
     meta->free = 1;
     meta->count = NUM_BLOCK;
     meta->freeList = 0;
-    // meta->idle = NUM_BLOCK - 1;
 
     // free block list
-    // for (uint32_t i = 1; i < NUM_BLOCK; i++) {
-    //     RecordBlock *block = (RecordBlock*)getBlock(i);
-    //     if (block == NULL) return false;
-    //     block->header.magic = 0xc1c6f01e;
-    //     block->header.index = i;
-    //     block->header.type = BLOCK_TYPE_FREE;
-    //     // add to free lsit
-    //     block->header.next = meta->free;
-    //     meta->free = i;
-    // }
+    for (uint32_t i = 1; i < NUM_BLOCK; i++) {
+        RecordBlock *block = (RecordBlock*)getBlock(i);
+        if (block == NULL) return false;
+        block->header.magic = MAGIC_NUM;
+        block->header.index = i;
+        block->header.type = BLOCK_TYPE_FREE;
+    }
 
-    return true;
-    // return save();
+    return save();
 }

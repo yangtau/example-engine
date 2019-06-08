@@ -15,14 +15,14 @@
 ///
 // @brief
 // File class
-class File {
+class EXFile {
 private:
     HANDLE handle;
 public:
 
-    File() : handle(INVALID_HANDLE_VALUE) {}
+    EXFile() : handle(INVALID_HANDLE_VALUE) {}
 
-    ~File() {
+    ~EXFile() {
         if (handle != INVALID_HANDLE_VALUE)
             CloseHandle(handle);
     }

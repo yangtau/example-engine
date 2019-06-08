@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="block.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="file.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -31,6 +28,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="matu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="block.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -76,10 +76,8 @@ class BTree {
     NodeBlock* root;
 
     bool insert(KeyValue kv, NodeBlock* cur);
-//    KeyValue insert(KeyValue kv, NodeBlock* cur);
     void remove(uint64_t key, NodeBlock* cur);
     bool removeByMark(uint64_t key, NodeBlock* cur);
-    //KeyValue search(uint64_t key, NodeBlock* cur);
 
    public:
     explicit BTree(StorageManager& s);

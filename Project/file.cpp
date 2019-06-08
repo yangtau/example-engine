@@ -11,7 +11,7 @@
 #include "file.h"
 
 
-bool File::readBlock(uint32_t index, void *block) {
+bool EXFile::readBlock(uint32_t index, void *block) {
     assert(block != NULL);
 
     // offset
@@ -27,11 +27,13 @@ bool File::readBlock(uint32_t index, void *block) {
     return true;
 }
 
-int File::create(const char *path, uint32_t num) {
+int EXFile::create(const char* path, uint32_t num) {
     // open file
     handle = CreateFileA((LPCSTR)path, GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
-        FILE_FLAG_NO_BUFFERING, nullptr);
+        //FILE_ATTRIBUTE_NORMAL,
+        FILE_FLAG_NO_BUFFERING,
+        nullptr);
     // read metadata block
 //    if (handle != INVALID_HANDLE_VALUE)
 //        meta = (MetaBlock *) readBlock(META_INDEX);
@@ -40,9 +42,14 @@ int File::create(const char *path, uint32_t num) {
     if (handle == INVALID_HANDLE_VALUE) {
         // the file does not exist
         // create file
-        handle = CreateFileA((TCHAR *)path, GENERIC_READ | GENERIC_WRITE,
-            FILE_SHARE_DELETE, nullptr, CREATE_ALWAYS,
-            FILE_FLAG_NO_BUFFERING, nullptr);
+        handle = CreateFileA((LPCSTR)path,
+            GENERIC_READ | GENERIC_WRITE,
+            FILE_SHARE_DELETE,
+            nullptr,
+            CREATE_ALWAYS,
+            //FILE_ATTRIBUTE_NORMAL,
+            FILE_FLAG_NO_BUFFERING,
+            nullptr);
         if (handle == INVALID_HANDLE_VALUE)
             return 0;
 
@@ -86,7 +93,7 @@ int File::create(const char *path, uint32_t num) {
 //    return b;
 //}
 
-bool File::writeBlock(uint32_t index, void *_block) {
+bool EXFile::writeBlock(uint32_t index, void *_block) {
     RecordBlock *block = (RecordBlock *)_block;
     // offset
     uint64_t offset = index * BLOCK_SIZE;  // the position of the block
@@ -102,18 +109,10 @@ bool File::writeBlock(uint32_t index, void *_block) {
     return WriteFile(handle, block, BLOCK_SIZE, &bytesToWrite, NULL) &&
         bytesToWrite == BLOCK_SIZE;
     // free block buffer
-//    bufferManager.freeBlock(block);
 }
 
-bool File::resize(uint32_t num) {
+bool EXFile::resize(uint32_t num) {
     return SetFilePointer(handle, BLOCK_SIZE * num, NULL, FILE_BEGIN) &&
         SetEndOfFile(handle);
 }
 
-//uint32_t File::getIndexOfRoot() {
-//    return meta->root;
-//}
-//
-//void File::setIndexOfRoot(uint32_t i) {
-//    meta->root = i;
-//}

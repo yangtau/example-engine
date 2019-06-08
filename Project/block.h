@@ -16,7 +16,7 @@
 #define BLOCK_TYPE_NODE 4  // interior node block or root block
 #define BLOCK_TYPE_LOG 5   // log block
 
-#define MAGIC_NUM 0xc1c6f01e
+#define MAGIC_NUM 0x1ef0c6c1
 
 #pragma pack(1)
 
@@ -27,7 +27,6 @@ struct RecordHeader {
 
 struct Record {
     RecordHeader header;
-    // uint8_t* getData();
     uint8_t data[1];
 };
 

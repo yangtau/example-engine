@@ -23,7 +23,7 @@ private:
     // `header.reserved` is used as a flag indicating whether the buffer is clean
     std::map<uint32_t, RecordBlock *> buffers;
 
-    File file;
+    EXFile file;
 
     BufferManager bufferManager;
 
@@ -31,7 +31,7 @@ private:
 
     bool initFile();
 public:
-    explicit StorageManager(const char *path);
+    explicit StorageManager(const char* path);
 
     ~StorageManager();
 
