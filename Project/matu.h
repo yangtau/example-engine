@@ -337,12 +337,35 @@ static Condition conditionParse(const string &sql, int start = 0) {
     return res;
 }
 
-static StorageManager s("table.db");
-static StorageManager st("index.db");
+static StorageManager s("table");
+static StorageManager st("index");
 static BTree bTree(st);
 static RecordBlock *block = NULL;
+#include <fstream>
 
-void initial() {}
+void initial() {
+    using std::ios;
+    std::ofstream file("table.db", ios::binary | ios::out);
+    if (!file.is_open())
+        return;
+    file.seekp(0, ios::beg);
+    char result[4] = { 0xc1, 0xc6, 0xf0, 0x1e };
+
+    file.write(result, sizeof(char) * 4);
+    file.seekp(4096, ios::beg);
+    file.write(result, sizeof(char) * 4);
+    file.close();
+
+    file.open("index.db", ios::binary | ios::out);
+    if (!file.is_open())
+        return;
+    
+
+    file.write(result, sizeof(char) * 4);
+    file.seekp(4096, ios::beg);
+    file.write(result, sizeof(char) * 4);
+    file.close();
+}
 
 void insert(RowData &data) {
     if (block == NULL) {
@@ -370,8 +393,8 @@ void insert(RowData &data) {
         }
     }
     free(rcd);
-    KeyValue kv = {data.id, block->header.index, pos};
-    //kv.key = r.id, kv.value = block->header.index, kv.position = pos;
+    KeyValue kv; //= {data.id, block->header.index, pos};
+    kv.key = data.id, kv.value = block->header.index, kv.position = pos;
     bTree.insert(kv);
 
 }

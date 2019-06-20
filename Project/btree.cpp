@@ -198,6 +198,7 @@ bool BTree::insert(KeyValue kv, NodeBlock *cur) {
     }
     return true;
 }
+
 void BTree::remove(uint64_t key, NodeBlock *cur) {
     uint16_t i = cur->find(key);
 

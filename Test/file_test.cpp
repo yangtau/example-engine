@@ -13,13 +13,13 @@ namespace UnitTest {
 public:
 
     TEST_METHOD(FileCreate) {
-        File file;
+        EXFile file;
         int res = file.create("file-test.db", 20);
         Assert::AreNotEqual(0, res);
     }
 
     TEST_METHOD(FileReadBlock) {
-        File file;
+        EXFile file;
         int res = file.create("file-test.db", 20);
         BufferManager buffer;
         Assert::AreNotEqual(0, res);
@@ -32,7 +32,7 @@ public:
     }
 
     TEST_METHOD(FileWriteBlock) {
-        File file;
+        EXFile file;
         int res = file.create("file-test.db", 20);
         Assert::AreNotEqual(0, res);
         BufferManager buffer;

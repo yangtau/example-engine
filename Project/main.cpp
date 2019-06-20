@@ -4,7 +4,7 @@
 #include "matu.h"
 #include <vector>
 #include <string>
-#include<windows.h>
+#include <windows.h>
 #include <fstream>
 #include <iostream>
 #include <ctime>
@@ -50,10 +50,10 @@ void testM1() {
         rowDatas.push_back(rowData);
         insert(rowDatas);
     }
-    /*if (!CheckFile("table.db")) {
+    if (!CheckFile("table.db")) {
         printf("wrong\n");
         return;
-    }*/
+    }
     vector<RowData> result = query("select * from table where id > 500 and id <999");
     bool flag = true;
     for (int i = 501; i < 999; i++) {
@@ -80,6 +80,7 @@ void testM1() {
             break;
         }
     }
+    //del("delete from table where id > 2956 and id < 7854");
     if (flag == false) {
         printf("wrong\n");
     }
@@ -100,10 +101,10 @@ void testM3() {
             return;
         }
     }
-    /*if (!CheckFile("table.db")) {
+    if (!CheckFile("table.db")) {
         printf("wrong\n");
         return;
-    }*/
+    }
     printf("yes\n");
     return;
 }
@@ -178,22 +179,20 @@ void testM2()
         return;
     }
 
-    /*if (!CheckFile("table.db")) {
+    if (!CheckFile("table.db")) {
         printf("wrong\n");
         return;
-    }*/
+    }
     printf("yes\n");
 }
 
 int main() {
     auto start = clock();
-    /*testM1();
-    testM2();
+    //testM1();
+    //testM2();
     testM3();
     auto end = clock();
-    std::cout << "Time: " << (end - start)*1.0 / CLOCKS_PER_SEC << std::endl;*/
-    CheckFile("table.db");
-    CheckFile("index.db");
+    std::cout << "Time: " << (end - start)*1.0 / CLOCKS_PER_SEC << std::endl;
     system("pause");
     return 0;
 }

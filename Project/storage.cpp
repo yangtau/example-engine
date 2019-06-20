@@ -54,6 +54,8 @@ const void* StorageManager::readBlock(uint32_t index) {
             return NULL;
         buffers[index] = block;
     }
+    if (block != NULL)
+        block->header.reserved = 1;
     return block;
 }
 
@@ -76,9 +78,10 @@ void* StorageManager::getFreeBlock() {
             block->header.type = BLOCK_TYPE_FREE;
 
         }
-        if (!save()) {
-            fprintf(stderr, "write file failed");
-        }
+        //if (!save()) {
+        //    // TODO: error handle
+        //    fprintf(stderr, "write file failed");
+        //}
     }
 
     RecordBlock* b = NULL;
@@ -143,14 +146,13 @@ bool StorageManager::initFile() {
     meta->count = NUM_BLOCK;
     meta->freeList = 0;
 
-    // free block list
-    for (uint32_t i = 1; i < NUM_BLOCK; i++) {
+    /*for (uint32_t i = 1; i < NUM_BLOCK; i++) {
         RecordBlock *block = (RecordBlock*)getBlock(i);
         if (block == NULL) return false;
         block->header.magic = MAGIC_NUM;
         block->header.index = i;
         block->header.type = BLOCK_TYPE_FREE;
-    }
-
-    return save();
+    }*/
+    //save();
+    return true;
 }
