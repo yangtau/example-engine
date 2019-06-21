@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 ////
 // @file storage.cpp
 // @brief
@@ -8,26 +9,65 @@
 //
 #include "storage.h"
 #include <assert.h>
+#include <stdlib.h>
 
 static const uint32_t NUM_BLOCK = 16;
 
-StorageManager::StorageManager(const char* path) : meta(NULL) {
-    int res = file.create(path, NUM_BLOCK);
-    if (res == 0) {
-        // TODO: failed to create file
+StorageManager::StorageManager() : meta(NULL), file(NULL) {}
+
+int StorageManager::create(const char * path) {
+    close();
+
+    FILE *file = fopen(path, "w");
+    if (file == NULL) return false;
+
+    MetaBlock *block = (MetaBlock*)bufferManager.allocateBlock();
+    block->header.index = 0;
+    block->header.type = BLOCK_TYPE_META;
+    block->header.magic = MAGIC_NUM;
+    block->header.next = 0;
+    block->count = 1;
+    block->free = 0;
+    block->root = 0;
+
+    if (fwrite(block, BLOCK_SIZE, 1, file) != 1) {
+        bufferManager.freeBlock(block);
+        return false;
     }
-    else if (res == 1) {
-        if (!initFile()) {
-            //TODO: error
-        }
-    }
-    meta = (MetaBlock*)getBlock(0);
+
+    fclose(file);
+
+    buffers[0] = (RecordBlock*)block;
+    return true;
 }
 
-StorageManager::~StorageManager() {
-    if (!save()) {
-        exit(1);
+int StorageManager::open(const char * path) {
+    close();
+    file = fopen(path, "r+");
+    if (file == NULL) return false;
+
+    // read meta
+    meta = (MetaBlock*)getBlock(0);
+    if (meta == NULL) return false;
+    return true;
+}
+
+int StorageManager::close() {
+    if (file != NULL) {
+        save();
+        fclose(file);
+        file = NULL;
+        for (auto& x : buffers) {
+            x.second->header.index = -1;
+        }
     }
+    return true;
+}
+
+
+
+StorageManager::~StorageManager() {
+    close();
     for (auto& x : buffers) {
         bufferManager.freeBlock(x.second);
     }
@@ -35,89 +75,91 @@ StorageManager::~StorageManager() {
 
 void* StorageManager::getBlock(uint32_t index) {
     RecordBlock* block = buffers[index];
-    if (block == NULL || block->header.index != index) {
+    if (block == NULL) {
         block = (RecordBlock*)bufferManager.allocateBlock();
-        if (!file.readBlock(index, block))
+        /*if (!file.readBlock(index, block))
+            return NULL;*/
+        if (fseek(file, index * BLOCK_SIZE, SEEK_SET) != 0) return NULL;
+        size_t res = fread(block, BLOCK_SIZE, 1, file);
+        if (res != 1) {
+            bufferManager.freeBlock(block);
             return NULL;
+        }
         buffers[index] = block;
+    }
+    if (block->header.index != index) {
+        if (fseek(file, index * BLOCK_SIZE, SEEK_SET) != 0) return NULL;
+        size_t res = fread(block, BLOCK_SIZE, 1, file);
+        if (res != 1) {
+            bufferManager.freeBlock(block);
+            return NULL;
+        }
     }
     if (block != NULL)
         block->header.reserved = 1;
     return block;
 }
 
-const void* StorageManager::readBlock(uint32_t index) {
-    RecordBlock* block = buffers[index];
-    if (block == NULL || block->header.index != index) {
-        block = (RecordBlock*)bufferManager.allocateBlock();
-        if (!file.readBlock(index, block))
-            return NULL;
-        buffers[index] = block;
-    }
-    if (block != NULL)
-        block->header.reserved = 1;
-    return block;
-}
+//const void* StorageManager::readBlock(uint32_t index) {
+//    RecordBlock* block = buffers[index];
+//    if (block == NULL || block->header.index != index) {
+//        block = (RecordBlock*)bufferManager.allocateBlock();
+//        /*if (!file.readBlock(index, block))
+//            return NULL;*/
+//        buffers[index] = block;
+//    }
+//    if (block != NULL)
+//        block->header.reserved = 1;
+//    return block;
+//}
 
-// TODO: remove `index`
+
 void* StorageManager::getFreeBlock() {
-    if (meta->free == meta->count && meta->freeList == 0) {
-        meta->count *= 2;
-        if (!file.resize(meta->count)) {
-            // TODO: resize failed
-            return NULL;
-        }
+    if (meta->free != 0) {
+        RecordBlock* block = (RecordBlock*)getBlock(meta->free);
+        if (block == NULL) return NULL;
 
-        // free block list
-        for (uint32_t i = meta->count / 2; i < meta->count; i++) {
-            RecordBlock* block = (RecordBlock*)getBlock(i);
-            if (block == NULL)
-                return NULL;
-            block->header.magic = MAGIC_NUM;
-            block->header.index = i;
-            block->header.type = BLOCK_TYPE_FREE;
-
-        }
-        //if (!save()) {
-        //    // TODO: error handle
-        //    fprintf(stderr, "write file failed");
-        //}
+        meta->free = block->header.next;
+        block->header.next = 0;
+        return block;
     }
 
-    RecordBlock* b = NULL;
-    // free list
-    if (meta->freeList != 0) {
-        b = (RecordBlock*)readBlock(meta->freeList);
-        if (b != NULL)
-            meta->freeList = b->header.next;
-    }
-    else {
-        b = (RecordBlock*)readBlock(meta->free);
-        if (b != NULL) {
-            b->header.index = meta->free;
-            meta->free++;
-        }
-    }
-    if (b == NULL)
+    RecordBlock* block = (RecordBlock*)bufferManager.allocateBlock();
+    if (block == NULL) return NULL;
+    block->header.index = meta->count++;
+    block->header.magic = MAGIC_NUM;
+    block->header.next = 0;
+
+    if (fseek(file, 0, SEEK_END) != 0 ||
+        fwrite(block, BLOCK_SIZE, 1, file) != 1) {
+        bufferManager.freeBlock(block);
         return NULL;
-    b->header.magic = MAGIC_NUM;
-    b->header.reserved = 1;
-    b->header.next = 0;
-    return b;
+    }
+    buffers[block->header.index] = block;
+    block->header.reserved = 1;
+
+    return block;
 }
 
-void StorageManager::freeBlock(uint32_t index) {
-    RecordBlock* b = (RecordBlock*)readBlock(index);
-    b->header.next = meta->freeList;
-    meta->freeList = index;
+int StorageManager::freeBlock(uint32_t index) {
+    RecordBlock* b = (RecordBlock*)getBlock(index);
+    if (b == NULL) return false;
+    b->header.next = meta->free;
+    meta->free = index;
+    return true;
 }
 
 bool StorageManager::save() {
     for (auto& x : buffers) {
         if (x.second->header.reserved == 1) {
-            if (!file.writeBlock(x.second->header.index, x.second))
-                return false;
+            /*if (!file.writeBlock(x.second->header.index, x.second))
+                return false;*/
+            if (fseek(file, x.first*BLOCK_SIZE, SEEK_SET) != 0) return false;
             x.second->header.reserved = 0;
+            if (fwrite(x.second, BLOCK_SIZE, 1, file) != 1) {
+                x.second->header.reserved = 1;
+                return false;
+            }
         }
     }
     return true;
@@ -128,31 +170,6 @@ uint32_t StorageManager::getIndexOfRoot() {
 }
 
 void StorageManager::setIndexOfRoot(uint32_t i) {
-    assert(i > 0 && i < meta->count);
+    //assert(i > 0 && i < meta->count);
     meta->root = i;
-}
-
-bool StorageManager::initFile() {
-    meta = (MetaBlock*)getBlock(0);
-    if (meta == NULL)
-        return false;
-
-    meta->header.magic = MAGIC_NUM;
-    meta->header.type = BLOCK_TYPE_META;
-    meta->header.index = 0;
-    meta->header.next = 0;
-    meta->root = 0;
-    meta->free = 1;
-    meta->count = NUM_BLOCK;
-    meta->freeList = 0;
-
-    /*for (uint32_t i = 1; i < NUM_BLOCK; i++) {
-        RecordBlock *block = (RecordBlock*)getBlock(i);
-        if (block == NULL) return false;
-        block->header.magic = MAGIC_NUM;
-        block->header.index = i;
-        block->header.type = BLOCK_TYPE_FREE;
-    }*/
-    //save();
-    return true;
 }

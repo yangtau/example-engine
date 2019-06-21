@@ -18,76 +18,94 @@
 
 ///
 // @breif
-// kv for B+tree
-struct KeyValue {
-    uint64_t key;
-    uint32_t value;
-    uint32_t position;
-};
-
-///
-// @breif
 // node of b+tree
 struct NodeBlock {
     BlockHeader header;
+    uint16_t count;
+    uint8_t keyLen;
+    uint8_t valLen;
 
-    // The first key is empty, if the block is an interior node
-#ifdef DEBUG_BTREE
-    KeyValue kv[4];
-#else
-    KeyValue kv[1];
-#endif  // DEBUG_BTREE
+    // key[1]value
+    // there is one bit bettween the key and value to indicate that whether the item is removed
 
-    static uint16_t size();
+    uint16_t size();
+
+    void init();
 
     bool full();
 
     bool empty();
 
-    // equal
-    bool eqMin();
+    bool leaf();
 
-    // greater or equal
-    // no need to maintain
-    bool geMin();
+    uint16_t find(void* key);
 
-    // return the index of first item whose key is not less than `key`
-    // if keys of all items is less than `key`, return `header.count`
-    uint16_t find(uint64_t key);
-
-    void insert(KeyValue item, uint16_t index);
-
+    void insert(void* key, void* value, uint16_t index);
 
     void split(NodeBlock* nextNode);
 
     // merge `nextNode` with this
     void merge(NodeBlock* nextNode);
 
-    bool isLeaf();
-
     void remove(uint16_t index);
 };
 
 #pragma pack()
 
-class BTree {
-   private:
-    StorageManager& storage;
+
+
+typedef int(*Compare)(const void *, const void *);
+
+
+class BTreeIterator {
+    NodeBlock *cur = NULL;
+    int index = -1;
+    BTree &btree;
+    const void *lo;
+    const void *hi;
+
+    BTreeIterator(const void *lo, const void *hi, BTree &t);
+
+    int next();
+
+    int forward();
+
+    int set(void *value);
+
+    int get(void *key, void *value);
+
+    // remove by mark
+    int remove();
+};
+
+struct BTree {
+    friend struct BTreeIterator;
+    friend struct NodeBlock;
+
+private:
+    StorageManager &storage;
     NodeBlock* root;
+    uint8_t keyLen;
+    uint8_t valLen;
 
-    bool insert(KeyValue kv, NodeBlock* cur);
-    void remove(uint64_t key, NodeBlock* cur);
-    bool removeByMark(uint64_t key, NodeBlock* cur);
+    Compare cmp;
 
-   public:
-    explicit BTree(StorageManager& s);
-    int insert(KeyValue kv);
-    int remove(uint64_t key);
-    KeyValue search(uint64_t key);
-    std::vector<KeyValue> search(uint64_t lo, uint64_t hi);
-    // [lo, +)
-    std::vector<KeyValue> lower(uint64_t lo);
-    // (-, hi]
-    std::vector<KeyValue> upper(uint64_t hi);
-    std::vector<KeyValue> values();
+    // range query
+    NodeBlock *cur = NULL;
+    int indexOfKey = -1; // the index of the current key in the block
+
+public:
+    BTree(uint8_t keyLength, uint8_t valueLength, Compare cmp, StorageManager &storage);
+
+    int put(const void* key, const void* value);
+
+    int get(const void* key, void* value);
+
+    int remove(const void *key);
+
+    // range query
+    // `lo` or `hi` can be NULL;
+    // if `lo` is NULL, it will start from the first items;
+    // if `hi` is NULL, it will end in the last item;
+    BTreeIterator iterator(const void *lo, const void *hi);
 };

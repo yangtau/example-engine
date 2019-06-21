@@ -6,6 +6,9 @@
 #include "buffer.h"
 #include "storage.h"
 #include <assert.h>
+#include <algorithm>
+using std::max;
+using std::min;
 
 using std::string;
 using std::vector;
@@ -22,10 +25,10 @@ Record *encode(const RowData &data) {
     uint16_t nameLen = data.name.size();
     uint16_t numLen = data.number.size();
     uint16_t emailLen = data.email.size();
-    Record *r = (Record *) malloc(sizeof(RecordHeader) + 14 + nameLen + emailLen +
+    Record *r = (Record *) malloc( 16 + nameLen + emailLen +
                                   numLen);
-    r->header.size = 14 + nameLen + emailLen + numLen;
-    uint8_t *p = (uint8_t *) r + sizeof(RecordHeader);
+    r->size = 16 + nameLen + emailLen + numLen;
+    uint8_t *p = (uint8_t *) r->data;
     *(uint16_t *) p = nameLen;
     p += 2;
     *(uint16_t *) p = numLen;

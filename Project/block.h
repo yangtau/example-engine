@@ -18,53 +18,55 @@
 
 #define MAGIC_NUM 0x1ef0c6c1
 
+const uint32_t BLOCK_SIZE = 4096;
+
 #pragma pack(1)
+//
+//struct RecordHeader {
+//    uint16_t size;       // bytes of data
+//    uint16_t timestamp;  // TODO: size of timestamp
+//};
 
-struct RecordHeader {
-    uint16_t size;       // bytes of data
-    uint16_t timestamp;  // TODO: size of timestamp
-};
-
-struct Record {
-    RecordHeader header;
-    uint8_t data[1];
-};
 
 ///
 // @brief
 // header of block
-// 96
+// 12
 struct BlockHeader {
     uint32_t magic;
     uint16_t type : 3;  // type of block
     uint16_t reserved : 13;
     uint16_t checksum;
-    uint16_t count;
-    uint16_t free;
-    uint32_t next;   // index of next block
     uint32_t index;  // index of this block
+    uint32_t next; // index of next block
+     
 
     uint16_t compute();  // compute checksum and set it
     int check();         // check checksum
 };
 
-struct Tailer {
-    uint16_t slots[1];
+
+struct Record {
+    uint16_t size; // size of the record
+    uint8_t data[1];
 };
 
-#pragma pack()
 
-const uint32_t BLOCK_SIZE = 4096;
 
 ///
 // @brief
-// block of record
+// record block
+// 12 + 8
 struct RecordBlock {
     BlockHeader header;
+    uint16_t count; // the number of records in this block
+    uint16_t free; // 
 
-    Tailer* getTailer();
-
+    uint16_t directory[1];
+ 
     void init();
+
+    int freeSize();
 
     int addRecord(Record* record, uint32_t* position);
 
@@ -74,8 +76,9 @@ struct RecordBlock {
 
     int updateRecord(uint32_t position, Record* record);
 
-    bool full();
 };
+#pragma pack()
+
 
 ///
 // @brief
@@ -85,5 +88,4 @@ struct MetaBlock {
     uint32_t free;      // the index of first free block
     uint32_t root;      // root of b+tree
     uint32_t count;     // num of blocks
-    uint32_t freeList;  // list of free block, 0 indicate no free block
 };

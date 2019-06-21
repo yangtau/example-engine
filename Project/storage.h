@@ -10,7 +10,6 @@
 #pragma once
 
 #include "block.h"
-#include "file.h"
 #include "buffer.h"
 #include <map>
 
@@ -20,28 +19,34 @@
 // storage manager
 class StorageManager {
 private:
-    // `header.reserved` is used as a flag indicating whether the buffer is clean
+    
     std::map<uint32_t, RecordBlock *> buffers;
-
-    EXFile file;
 
     BufferManager bufferManager;
 
     MetaBlock *meta;
 
-    bool initFile();
+    FILE *file;
+
+    
 public:
-    explicit StorageManager(const char* path);
+    explicit StorageManager();
+
+    int create(const char *path);
+
+    int open(const char *path);
+
+    int close();
 
     ~StorageManager();
 
     void *getBlock(uint32_t index);
 
-    const void *readBlock(uint32_t index);
+    //const void *readBlock(uint32_t index);
 
     void* getFreeBlock();
 
-    void freeBlock(uint32_t index);
+    int freeBlock(uint32_t index);
 
     bool save();
 

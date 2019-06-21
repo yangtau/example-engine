@@ -16,26 +16,28 @@ uint16_t NodeBlock::size() {
 #ifdef DEBUG_BTREE
     return 4;
 #else
-    return ((BLOCK_SIZE - sizeof(BlockHeader)) / sizeof(KeyValue));
+    return ((BLOCK_SIZE - sizeof(BlockHeader) - 4) / (keyLen + valLen));
 #endif // DEBUG_BTREE   
 }
 
+void NodeBlock::init() {
+}
+
 bool NodeBlock::full() {
-    assert(header.count <= NodeBlock::size());
-    return header.count == NodeBlock::size();
+    return count == NodeBlock::size();
 }
 
 bool NodeBlock::empty() {
-    return header.count == 0;
+    return count == 0;
 }
 
-bool NodeBlock::eqMin() {
-    return header.count == size() / 2;
-}
-
-bool NodeBlock::geMin() {
-    return header.count >= size() / 2;
-}
+//bool NodeBlock::eqMin() {
+//    return header.count == size() / 2;
+//}
+//
+//bool NodeBlock::geMin() {
+//    return header.count >= size() / 2;
+//}
 
 uint16_t NodeBlock::find(uint64_t key) {
     assert(!empty());

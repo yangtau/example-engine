@@ -37,128 +37,123 @@ int BlockHeader::check() {
     return sum == 0xffff;
 }
 
-Tailer* RecordBlock::getTailer() {
-    // `BLOCK_SIZE - 2 * header.count` is offset of the tailor
-    return (Tailer*)((uint8_t*)(this) + BLOCK_SIZE - 2 * header.count);
-}
-
 void RecordBlock::init() {
-    header.count = 0;
-    header.free = sizeof(BlockHeader);
-    header.next = 0;
+    count = 0;
+    free = BLOCK_SIZE;
+    header.magic = MAGIC_NUM;
+    header.type = BLOCK_TYPE_DATA;
 }
 
-int RecordBlock::delRecord(uint32_t position) {
-    if (position > header.count) {
-        return false;
-    }
-
-    position = header.count - position - 1;
-
-    uint16_t offset = getTailer()->slots[position];
-    if (offset == 0) return false;
-
-    Record* record = (Record*)((uint8_t*)this + offset);
-    uint16_t size = record->header.size + sizeof(RecordHeader);
-    getTailer()->slots[position] = 0;  // pointer to 0
-    // move memory, `offset + size - header.free` is the size to move
-    memmove(record, (uint8_t*)record + size, header.free - offset + size);
-    header.free -= size;
-    // modify offset table (tailer)
-    for (uint16_t i = 0; i < header.count; i++) {
-        if (getTailer()->slots[i] > offset) {
-            getTailer()->slots[i] -= size;
-        }
-    }
-    return true;
+int RecordBlock::freeSize() {
+    return (int)free - ((uint8_t*)&directory[count + 1] - (uint8_t*)this);
 }
 
 int RecordBlock::addRecord(Record* record, uint32_t *position) {
-    uint16_t size = record->header.size + sizeof(RecordHeader);
-    // `BLOCK_SIZE - 2 * header.count` is offset of the tailor, 2 bytes for
-    // offset
-    if (size + 2 + header.free >= BLOCK_SIZE - 2 * header.count) {
-        // memory is not enough, add to next block
+    if (record->size > freeSize()) {
         return false;
     }
-    // copy header record
-    memcpy((uint8_t*)this + header.free, record, sizeof(RecordHeader));
-    // *(RecordHeader*)((uint8_t*)this + header.free) = record->header;
-    // copy data of record
-    memcpy((uint8_t*)this + header.free + sizeof(RecordHeader),
-        record->data, record->header.size);
-    // order of following operations is important !!!
-    header.count++;
-    getTailer()->slots[0] = header.free;  // getTailer() is calculated by count,
-                                          // so count must be update before this
-    header.free += size;
-    if (position != NULL) *position = header.count - 1;
+    RecordBlock::free -= record->size;
+
+    memcpy((uint8_t*)this + free, record, record->size);
+
+    if (position != NULL) *position = RecordBlock::count;
+
+    RecordBlock::directory[RecordBlock::count++] = RecordBlock::free;
+    return true;
+}
+
+int RecordBlock::delRecord(uint32_t position) {
+    if (position >= count) {
+        return false;
+    }
+
+    // a simple implementation
+    directory[position] = 0;
+
+    //uint16_t offset = directory[position];
+    //
+    //if (offset == 0) return false;
+
+    //Record* record = (Record*)((uint8_t*)this + offset);
+    //uint16_t size = record->size;
+    //directory[position] = 0;  // pointer to 0
+    //// move memory, `offset + size - header.free` is the size to move
+    //memmove(record, (uint8_t*)record + size, header.free - offset + size);
+    //header.free -= size;
+    //// modify offset table (tailer)
+    //for (uint16_t i = 0; i < header.count; i++) {
+    //    if (getTailer()->slots[i] > offset) {
+    //        getTailer()->slots[i] -= size;
+    //    }
+    //}
     return true;
 }
 
 Record* RecordBlock::getRecord(uint32_t position) {
-
-    if (position >= header.count) {
+    if (position >= count) {
         // todo
         return NULL;
     }
 
-    // TODO
-    position = header.count - 1 - position;
-    uint16_t offset = getTailer()->slots[position];
+    uint16_t offset = directory[position];
+
     // if the record is removed, the offset is 0
     if (offset == 0) return NULL;
+
     Record* res = (Record*)((uint8_t*)this + offset);
     // res->data = (uint8_t*)this + offset + sizeof(RecordHeader);
+
     return res;
 }
 
 int RecordBlock::updateRecord(uint32_t position, Record* record) {
-
-    // remove the old and insert the new record
     Record* old = getRecord(position);  // get the old record
     if (old == NULL) {
         // the position of the old record is false
         return false;
     }
-    // TODO
-    position = header.count - 1 - position;
 
-    if (old->header.size == record->header.size) {
-        old->header = record->header;
-        memcpy((uint8_t*)old + sizeof(RecordHeader), record->data,
-            record->header.size);
+    if (old->size >= record->size) {
+        //old->header = record->header;
+        memcpy((uint8_t*)old, record, record->size);
         return true;
     }
 
-    if (record->header.size - old->header.size + header.free >= BLOCK_SIZE - 2 * header.count) {
+    if (record->size > freeSize()) {
         // memory is not enough, add to next block
         return false;
     }
 
-    uint16_t offset = getTailer()->slots[position];
-    if (offset == 0) return false;
+    delRecord(position);
 
-    uint16_t size = old->header.size + sizeof(RecordHeader);
-    // move memory, `offset + size - header.free` is the size to move
-    memmove(old, (uint8_t*)old + size, header.free - offset - size);
-    header.free -= size;
-    // modify offset table (tailer)
-    for (uint16_t i = 0; i < header.count; i++) {
-        if (getTailer()->slots[i] > offset) {
-            getTailer()->slots[i] -= size;
-        }
-    }
-    memcpy((uint8_t*)this + header.free, record, sizeof(RecordHeader));
-    // *(RecordHeader*)((uint8_t*)this + header.free) = record->header;
-    // copy data of record
-    memcpy((uint8_t*)this + header.free + sizeof(RecordHeader),
-        record->data, record->header.size);
-    getTailer()->slots[position] = header.free;  // point to new position
-    header.free += sizeof(RecordHeader) + record->header.size;
+    // insert
+    RecordBlock::free -= record->size;
+
+    memcpy((uint8_t*)this + free, record, record->size);
+
+    RecordBlock::directory[position] = RecordBlock::free;
+    return true;
+
+    //uint16_t offset = getTailer()->slots[position];
+    //if (offset == 0) return false;
+
+    //uint16_t size = old->size;
+    //// move memory, `offset + size - header.free` is the size to move
+    //memmove(old, (uint8_t*)old + size, header.free - offset - size);
+    //header.free -= size;
+    //// modify offset table (tailer)
+    //for (uint16_t i = 0; i < header.count; i++) {
+    //    if (getTailer()->slots[i] > offset) {
+    //        getTailer()->slots[i] -= size;
+    //    }
+    //}
+    ////memcpy((uint8_t*)this + header.free, record, sizeof(RecordHeader));
+    //// *(RecordHeader*)((uint8_t*)this + header.free) = record->header;
+    //// copy data of record
+    //memcpy((uint8_t*)this + header.free,
+    //    record->data, record->size);
+    //getTailer()->slots[position] = header.free;  // point to new position
+    //header.free += record->size;
     return true;
 }
 
-bool RecordBlock::full() {
-    return false;
-}
