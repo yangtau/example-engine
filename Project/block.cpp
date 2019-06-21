@@ -40,7 +40,6 @@ int BlockHeader::check() {
 void RecordBlock::init() {
     count = 0;
     free = BLOCK_SIZE;
-    header.magic = MAGIC_NUM;
     header.type = BLOCK_TYPE_DATA;
 }
 

@@ -39,7 +39,7 @@ struct BlockHeader {
     uint16_t checksum;
     uint32_t index;  // index of this block
     uint32_t next; // index of next block
-     
+    uint32_t last;
 
     uint16_t compute();  // compute checksum and set it
     int check();         // check checksum
@@ -62,7 +62,7 @@ struct RecordBlock {
     uint16_t count; // the number of records in this block
     uint16_t free; // 
 
-    uint16_t directory[1];
+    uint16_t directory[0];
  
     void init();
 

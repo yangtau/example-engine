@@ -26,6 +26,8 @@ int StorageManager::create(const char * path) {
     block->header.type = BLOCK_TYPE_META;
     block->header.magic = MAGIC_NUM;
     block->header.next = 0;
+    block->header.last = 0;
+
     block->count = 1;
     block->free = 0;
     block->root = 0;
@@ -121,6 +123,7 @@ void* StorageManager::getFreeBlock() {
 
         meta->free = block->header.next;
         block->header.next = 0;
+        block->header.type = BLOCK_TYPE_FREE;
         return block;
     }
 
@@ -129,6 +132,7 @@ void* StorageManager::getFreeBlock() {
     block->header.index = meta->count++;
     block->header.magic = MAGIC_NUM;
     block->header.next = 0;
+    block->header.last = 0;
 
     if (fseek(file, 0, SEEK_END) != 0 ||
         fwrite(block, BLOCK_SIZE, 1, file) != 1) {

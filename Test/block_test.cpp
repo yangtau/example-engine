@@ -52,7 +52,7 @@ public:
             unsigned size = 2;
             block->init();
             // add multi records
-            int len = 1019;
+            int len = (4096-sizeof(RecordBlock)) / 4;
             for (int i = 0; i < len; i++) {
                 Assert::AreEqual(1, block->addRecord((Record*)data, NULL));
             }
