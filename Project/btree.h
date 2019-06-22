@@ -116,7 +116,8 @@ public:
         bool hasNext = false;
         bool opened = false;
     public:
-        Iterator(BTree &bt) : btree(bt) {}
+        Iterator(BTree &bt) : btree(bt) {
+        }
 
         ~Iterator() {
             close();

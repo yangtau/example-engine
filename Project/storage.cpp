@@ -15,13 +15,13 @@ static const uint32_t NUM_BLOCK = 16;
 
 StorageManager::StorageManager() : meta(NULL), file(NULL) {}
 
-StorageManager::StorageManager(const char * path):meta(NULL), file(NULL) {
+StorageManager::StorageManager(const char * path) : meta(NULL), file(NULL) {
     open(path);
 }
 
 int StorageManager::create(const char * path) {
     //close();
-    FILE *file = fopen(path, "w");
+    FILE *file = fopen(path, "wb");
     if (file == NULL) return false;
 
     MetaBlock *block = (MetaBlock*)bufferManager.allocateBlock();
@@ -48,7 +48,7 @@ int StorageManager::create(const char * path) {
 
 int StorageManager::open(const char * path) {
     //close();
-    file = fopen(path, "r+");
+    file = fopen(path, "r+b");
     if (file == NULL) return false;
 
     // read meta
@@ -61,6 +61,7 @@ int StorageManager::open(const char * path) {
 int StorageManager::close() {
     if (file != NULL) {
         save();
+        fflush(file);
         fclose(file);
         file = NULL;
         for (auto& x : buffers) {
@@ -91,9 +92,10 @@ bool StorageManager::save() {
 
 StorageManager::~StorageManager() {
     close();
-    for (auto& x : buffers) {
+    //? TODO:
+ /*   for (auto& x : buffers) {
         bufferManager.freeBlock(x.second);
-    }
+    }*/
 }
 
 void* StorageManager::getBlock(uint32_t index) {
@@ -156,7 +158,7 @@ void* StorageManager::getFreeBlock() {
     block->header.next = 0;
     block->header.last = 0;
 
-    if (fseek(file, 0, SEEK_END) != 0 ||
+    if (fseek(file, (meta->count - 1)*BLOCK_SIZE, SEEK_SET) != 0 ||
         fwrite(block, BLOCK_SIZE, 1, file) != 1) {
         bufferManager.freeBlock(block);
         return NULL;
@@ -191,6 +193,7 @@ void RecordManager::nextRoot() {
     newRoot->header.next = root->header.index;
     root->header.last = newRoot->header.index;
     s.setIndexOfRoot(newRoot->header.index);
+    root = newRoot;
 }
 
 RecordManager::RecordManager(StorageManager & s) :s(s) {
@@ -212,9 +215,11 @@ RecordManager::RecordManager(StorageManager & s) :s(s) {
 }
 
 int RecordManager::put(const Record * rcd, Location * loc) {
+    loc->index = root->header.index;
     if (!root->addRecord(rcd, &loc->position)) {
         nextRoot();
         int res = root->addRecord(rcd, &loc->position);
+        loc->index = root->header.index;
         assert(res == 1);
         return res;
     }

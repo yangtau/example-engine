@@ -132,13 +132,15 @@ static Condition conditionParse(const string& sql, int start = 0) {
             res.a = num;
             res.flag = RES_LO;
             break;
-        } else if (sql[start] == '=') {
+        }
+        else if (sql[start] == '=') {
             op = OP_EQ;
             num = str2int(sql, start);
             res.a = num;
             res.flag = RES_EQ_FIRST;
             break;
-        } else if (sql[start] == '<') {
+        }
+        else if (sql[start] == '<') {
             op = OP_LE;
             num = str2int(sql, start) - (sql[start + 1] == '=' ? 0 : 1);
             res.a = num;
@@ -167,50 +169,60 @@ static Condition conditionParse(const string& sql, int start = 0) {
                     if (conn == 1) {
                         // >=num and >=x
                         num = max(num, x);
-                    } else if (conn == 0) {
+                    }
+                    else if (conn == 0) {
                         // >=num or >=x
                         num = min(num, x);
                     }
                     res.a = num;
                     res.flag = RES_LO;
-                } else if (op == OP_EQ) {
+                }
+                else if (op == OP_EQ) {
                     if (conn == 1) {
                         // =num and >=x
                         if (num < x) {
                             res.flag = RES_BAD;
-                        } else {
+                        }
+                        else {
                             res.a = num;
                             res.flag = RES_EQ_FIRST;
                         }
-                    } else if (conn == 0) {
+                    }
+                    else if (conn == 0) {
                         // = num or >=x
                         if (num >= x) {
                             res.a = x;
                             res.flag = RES_LO;
-                        } else {
+                        }
+                        else {
                             res.a = num;
                             res.b = x;
                             res.flag = RES_EQ_LO;
                         }
                     }
-                } else if (op == OP_LE) {
+                }
+                else if (op == OP_LE) {
                     if (conn == 1) {
                         // <=num and >=x
                         if (x > num) {
                             res.flag = RES_BAD;
-                        } else if (x == num) {
+                        }
+                        else if (x == num) {
                             res.a = x;
                             res.flag = RES_EQ_FIRST;
-                        } else {
+                        }
+                        else {
                             res.a = x;
                             res.b = num;
                             res.flag = RES_AND;
                         }
-                    } else if (conn == 0) {
+                    }
+                    else if (conn == 0) {
                         // <=num or >=x
                         if (x <= num + 1) {
                             res.flag = RES_ALL;
-                        } else {
+                        }
+                        else {
                             res.a = num;
                             res.b = x;
                             res.flag = RES_OR;
@@ -218,118 +230,141 @@ static Condition conditionParse(const string& sql, int start = 0) {
                     }
                 }
                 break;
-            } else if (sql[start] == '=') {
+            }
+            else if (sql[start] == '=') {
                 x = str2int(sql, start);
                 if (op == OP_EQ) {
                     if (conn == 1) {  // and
                         if (x == num) {
                             res.a = x;
                             res.flag = RES_EQ_FIRST;
-                        } else {
+                        }
+                        else {
                             res.flag = RES_BAD;
                         }
-                    } else if (conn == 0) {  // or
+                    }
+                    else if (conn == 0) {  // or
                         if (x == num) {
                             res.a = x;
                             res.flag = RES_EQ_FIRST;
-                        } else {
+                        }
+                        else {
                             res.a = x;
                             res.b = num;
                             res.flag = RES_EQ_BOTH;
                         }
                     }
-                } else if (op == OP_GE) {
+                }
+                else if (op == OP_GE) {
                     if (conn == 1) {  // and
                         // >=num  and =x
                         if (num > x) {
                             res.flag = RES_BAD;
-                        } else {
+                        }
+                        else {
                             res.a = x;
                             res.flag = RES_EQ_FIRST;
                         }
-                    } else if (conn == 0) {  // or
-                                             // >=num or =x
+                    }
+                    else if (conn == 0) {  // or
+                                          // >=num or =x
                         if (x >= num) {
                             res.a = num;
                             res.flag = RES_LO;
-                        } else {
+                        }
+                        else {
                             res.a = x;
                             res.b = num;
                             res.flag = RES_EQ_LO;
                         }
                     }
-                } else if (op == OP_LE) {
+                }
+                else if (op == OP_LE) {
                     if (conn == 1) {  // and
                         // <=num and =x
                         if (x > num) {
                             res.flag = RES_BAD;
-                        } else {
+                        }
+                        else {
                             res.a = num;
                             res.flag = RES_EQ_FIRST;
                         }
-                    } else if (conn == 0) {  // or
-                                             // <=num or =x
+                    }
+                    else if (conn == 0) {  // or
+                                          // <=num or =x
                         if (x > num) {
                             res.a = x;
                             res.b = num;
                             res.flag = RES_EQ_HI;
-                        } else {
+                        }
+                        else {
                             res.a = num;
                             res.flag = RES_HI;
                         }
                     }
                 }
                 break;
-            } else if (sql[start] == '<') {
+            }
+            else if (sql[start] == '<') {
                 x = str2int(sql, start) - (sql[start + 1] == '=' ? 0 : 1);
                 if (op == OP_GE) {
                     if (conn == 1) {  // and
                         // >=num and <=x
                         if (x < num) {
                             res.flag = RES_BAD;
-                        } else if (x == num) {
+                        }
+                        else if (x == num) {
                             res.a = x;
                             res.flag = RES_EQ_FIRST;
-                        } else {
+                        }
+                        else {
                             res.a = num;
                             res.b = x;
                             res.flag = RES_AND;
                         }
-                    } else if (conn == 0) {  // or
-                                             // >=num or <=x
+                    }
+                    else if (conn == 0) {  // or
+                                          // >=num or <=x
                         if (x + 1 >= num) {
                             res.flag = RES_ALL;
-                        } else {
+                        }
+                        else {
                             res.a = x;
                             res.b = num;
                             res.flag = RES_OR;
                         }
                     }
-                } else if (op == OP_EQ) {
+                }
+                else if (op == OP_EQ) {
                     if (conn == 1) {  // and
                         // =num and <=x
                         if (num > x) {
                             res.flag = RES_BAD;
-                        } else {
+                        }
+                        else {
                             res.a = num;
                             res.flag = RES_EQ_FIRST;
                         }
-                    } else if (conn == 0) {  // or
-                                             // =num OR <=x
+                    }
+                    else if (conn == 0) {  // or
+                                          // =num OR <=x
                         if (num > x) {
                             res.a = num;
                             res.b = x;
                             res.flag = RES_EQ_HI;
-                        } else {
+                        }
+                        else {
                             res.a = x;
                             res.flag = RES_HI;
                         }
                     }
-                } else if (op == OP_LE) {
+                }
+                else if (op == OP_LE) {
                     if (conn == 1) {  // and
                         // <= num and <= x
                         num = min(num, x);
-                    } else if (conn == 0) {  // or
+                    }
+                    else if (conn == 0) {  // or
                         num = max(num, x);
                     }
                     res.a = num;
@@ -345,263 +380,206 @@ uint8_t keylen = sizeof(int), vallen = sizeof(RecordManager::Location);
 int cmp(const void* a, const void* b) {
     return *(int*)a - *(int*)b;
 }
-StorageManager s("table.db");
-StorageManager st("index.db");
-BTree bTree(keylen, vallen, cmp, st);
-RecordManager rm(s);
+StorageManager* s = NULL;
+StorageManager* st = NULL;
+BTree* bTree = NULL;
+RecordManager* rm = NULL;
+bool initialized = false;
+void init() {
+    if (initialized)
+        return;
+    if (s == NULL) {
+        s = new StorageManager();
+        s->open("table.db");
+    }
+    if (st == NULL) {
+        st = new StorageManager();
+        st->open("index.db");
+    }
+
+    if (bTree == NULL)
+        bTree = new BTree(keylen, vallen, cmp, *st);
+    if (rm == NULL)
+        rm = new RecordManager(*s);
+    initialized = true;
+}
+void release() {
+    if (s != NULL) {
+        delete s;
+        s = NULL;
+    }
+    if (st != NULL) {
+        delete st;
+        st = NULL;
+    }
+    if (bTree != NULL) {
+        delete bTree;
+        bTree = NULL;
+    }
+    if (rm != NULL) {
+        delete rm;
+        rm = NULL;
+    }
+}
 
 void initial() {
-    s.create("table.db");
-    s.open("table.db");
-    st.create("index.db");
-    st.open("index.db");
+    s = new StorageManager();
+    s->create("table.db");
+    s->open("table.db");
+    st = new StorageManager();
+    st->create("index.db");
+    st->open("index.db");
+
+    if (bTree == NULL)
+        bTree = new BTree(keylen, vallen, cmp, *st);
+    if (rm == NULL)
+        rm = new RecordManager(*s);
+
+    atexit(release);
+    initialized = true;
 }
 
 void insert(RowData& data) {
     Record* rcd = encode(data);
     RecordManager::Location loc;
-    rm.put(rcd, &loc);
+    rm->put(rcd, &loc);
     free(rcd);
-    bTree.put(&data.id, &loc);
+    bTree->put(&data.id, &loc);
 }
 
 void insert(std::vector<RowData> rows) {
+    init();
     for (auto& r : rows) {
         insert(r);
     }
 }
 
-// vector<RecordManager::Location> search(const string& sql) {
-// vector<RecordManager::Location> r;
-
-// Condition con = conditionParse(sql);
-// BTree::Iterator* it = bTree.iterator();
-// int t;
-// switch (con.flag) {
-//     case RES_ALL:
-//         it->open(NULL, NULL);
-//         do {
-//             RecordManager::Location loc;
-//             it->get(NULL, &loc);
-//             r.push_back(loc);
-//         } while (it->next());
-//         it->close();
-//         break;
-//     case RES_AND:
-//         t = con.b + 1;
-//         it->open(&con.a, &t);
-//         do {
-//             RecordManager::Location loc;
-//             it->get(NULL, &loc);
-//             r.push_back(loc);
-//         } while (it->next());
-//         it->close();
-//         break;
-//     case RES_OR:
-//         t = con.a + 1;
-//         it->open(NULL, &t);
-//         do {
-//             RecordManager::Location loc;
-//             it->get(NULL, &loc);
-//             r.push_back(loc);
-//         } while (it->next());
-//         it->close();
-//         it->open(&con.b, NULL);
-//         do {
-//             RecordManager::Location loc;
-//             it->get(NULL, &loc);
-//             r.push_back(loc);
-//         } while (it->next());
-//         it->close();
-//     case RES_EQ_BOTH:
-//         RecordManager::Location loca, locb;
-//         bTree.get(&con.a, &loca);
-//         bTree.get(&con.b, &locb);
-//         if (con.a > con.b) {
-//             r.push_back(loca);
-//             r.push_back(locb);
-//         } else {
-//             r.push_back(locb);
-//             r.push_back(loca);
-//         }
-//         break;
-//     case RES_EQ_FIRST:
-//         RecordManager::Location loca;
-//         bTree.get(&con.a, &loca);
-//         r.push_back(loca);
-//         break;
-//     case RES_EQ_HI:
-//         t = con.b + 1;
-//         it->open(NULL, &t);
-//         do {
-//             RecordManager::Location loc;
-//             it->get(NULL, &loc);
-//             r.push_back(loc);
-//         } while (it->next());
-//         it->close();
-
-//         RecordManager::Location loca;
-//         bTree.get(&con.a, &loca);
-//         r.push_back(loca);
-//         break;
-//     case RES_EQ_LO:
-//         RecordManager::Location loca;
-//         bTree.get(&con.a, &loca);
-//         r.push_back(loca);
-
-//         it->open(&con.b, NULL);
-//         do {
-//             RecordManager::Location loc;
-//             it->get(NULL, &loc);
-//             r.push_back(loc);
-//         } while (it->next());
-//         it->close();
-//         break;
-//     case RES_HI:
-//         t = con.a + 1;
-//         it->open(NULL, &t);
-//         do {
-//             RecordManager::Location loc;
-//             it->get(NULL, &loc);
-//             r.push_back(loc);
-//         } while (it->next());
-//         it->close();
-//         break;
-//     case RES_LO:
-//         it->open(&con.a, NULL);
-//         do {
-//             RecordManager::Location loc;
-//             it->get(NULL, &loc);
-//             r.push_back(loc);
-//         } while (it->next());
-//         it->close();
-//         break;
-//     default:
-//         break;
-// }
-// delete it;
-// }
-
 std::vector<RowData> query(string sql) {
+    init();
+    atexit(release);
     vector<RowData> res;
-    vector<RecordManager::Location> r;
+    // vector<RecordManager::Location> r;
 
     Condition con = conditionParse(sql);
-    BTree::Iterator* it = bTree.iterator();
+    BTree::Iterator* it = bTree->iterator();
     int t;
     switch (con.flag) {
-        case RES_AND:
-            t = con.b + 1;
-            it->open(&con.a, &t);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                res.push_back(decode(rcd));
-            } while (it->next());
-            it->close();
-            break;
-        case RES_OR:
-            t = con.a + 1;
-            it->open(NULL, &t);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                res.push_back(decode(rcd));
-            } while (it->next());
-            it->close();
-            it->open(&con.b, NULL);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                res.push_back(decode(rcd));
-            } while (it->next());
-            it->close();
-        case RES_EQ_FIRST:
-            RecordManager::Location loca;
-            bTree.get(&con.a, &loca);
-            const Record* rcd = rm.get(&loca);
-            res.push_back(decode(rcd));
-            break;
+    case RES_AND:
+        t = con.b + 1;
+        if (it->open(&con.a, &t) == 0) break;
 
-        case RES_HI:
-            t = con.a + 1;
-            it->open(NULL, &t);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                res.push_back(decode(rcd));
-            } while (it->next());
-            it->close();
-            break;
-        case RES_LO:
-            it->open(&con.a, NULL);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                res.push_back(decode(rcd));
-            } while (it->next());
-            it->close();
-            break;
-        default:
-            break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        break;
+    case RES_OR:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        if (it->open(&con.b, NULL) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        break;
+    case RES_EQ_FIRST: {
+        RecordManager::Location loca;
+        bTree->get(&con.a, &loca);
+        const Record* rcd = rm->get(&loca);
+        res.push_back(decode(rcd));
+    } break;
+
+    case RES_HI:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        break;
+    case RES_LO:
+        if (it->open(&con.a, NULL) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        break;
+    default:
+        break;
     }
     delete it;
-
     return res;
 }
 
 void del(string sql) {
+    init();
     Condition con = conditionParse(sql);
-    BTree::Iterator* it = bTree.iterator();
+    BTree::Iterator* it = bTree->iterator();
     int t;
     switch (con.flag) {
-        case RES_AND:
-            t = con.b + 1;
-            it->open(&con.a, &t);
-            do {
-                it->remove();
-            } while (it->next());
-            it->close();
-            break;
-        case RES_OR:
-            t = con.a + 1;
-            it->open(NULL, &t);
-            do {
-                it->remove();
-            } while (it->next());
-            it->close();
-            it->open(&con.b, NULL);
-            do {
-                it->remove();
-            } while (it->next());
-            it->close();
-        case RES_EQ_FIRST:
-            RecordManager::Location loca;
-            bTree.remove(&con.a);
-            break;
+    case RES_AND:
+        t = con.b + 1;
+        if (it->open(&con.a, &t) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        break;
+    case RES_OR:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        if (it->open(&con.b, NULL) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        break;
+    case RES_EQ_FIRST:
+        RecordManager::Location loca;
+        bTree->remove(&con.a);
+        break;
 
-        case RES_HI:
-            t = con.a + 1;
-            it->open(NULL, &t);
-            do {
-                it->remove();
-            } while (it->next());
-            it->close();
-            break;
-        case RES_LO:
-            it->open(&con.a, NULL);
-            do {
-                it->remove();
-            } while (it->next());
-            it->close();
-            break;
-        default:
-            break;
+    case RES_HI:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        break;
+    case RES_LO:
+        if (it->open(&con.a, NULL) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        break;
+    default:
+        break;
     }
     delete it;
 }
@@ -625,6 +603,7 @@ Record* up(const Record* rcd, int sex, string name, string num, string mail) {
 }
 
 void update(string sql) {
+    init();
     int sex = -1;
     string num = "", mail = "", name = "";
 
@@ -642,7 +621,8 @@ void update(string sql) {
             i++;
         i++;
         sex = str2int(sql.substr(i));
-    } else if (sql[i] == 'e') {
+    }
+    else if (sql[i] == 'e') {
         // email
         while (sql[i] != '=')
             i++;
@@ -653,7 +633,8 @@ void update(string sql) {
         while (sql[j] != ' ')
             j++;
         mail = sql.substr(i, j - i);
-    } else if (sql[i] == 'n' && sql[i + 1] == 'a') {
+    }
+    else if (sql[i] == 'n' && sql[i + 1] == 'a') {
         // name
         while (sql[i] != '=')
             i++;
@@ -664,7 +645,8 @@ void update(string sql) {
         while (sql[j] != ' ')
             j++;
         name = sql.substr(i, j - i);
-    } else if (sql[i] == 'n' && sql[i + 1] == 'u') {
+    }
+    else if (sql[i] == 'n' && sql[i + 1] == 'u') {
         // number
         while (sql[i] != '=')
             i++;
@@ -678,84 +660,85 @@ void update(string sql) {
     }
 
     Condition con = conditionParse(sql);
-    BTree::Iterator* it = bTree.iterator();
+    BTree::Iterator* it = bTree->iterator();
     int t;
     switch (con.flag) {
-        case RES_AND:
-            t = con.b + 1;
-            it->open(&con.a, &t);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                // update
-                Record* r = up(rcd, sex, name, num, mail);
-                rm.set(r, &loc);
-                it->set(&loc);
-            } while (it->next());
-            it->close();
-            break;
-        case RES_OR:
-            t = con.a + 1;
-            it->open(NULL, &t);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                // update
-                Record* r = up(rcd, sex, name, num, mail);
-                rm.set(r, &loc);
-                it->set(&loc);
-            } while (it->next());
-            it->close();
-            it->open(&con.b, NULL);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                // update
-                Record* r = up(rcd, sex, name, num, mail);
-                rm.set(r, &loc);
-                it->set(&loc);
-            } while (it->next());
-            it->close();
-        case RES_EQ_FIRST:
-            RecordManager::Location loca;
-            bTree.get(&con.a, &loca);
-            const Record* rcd = rm.get(&loca);
+    case RES_AND:
+        t = con.b + 1;
+        if (it->open(&con.a, &t) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
             Record* r = up(rcd, sex, name, num, mail);
-            bTree.put(&con.a, &loca);
-            break;
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        break;
+    case RES_OR:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
+            Record* r = up(rcd, sex, name, num, mail);
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        if (it->open(&con.b, NULL) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
+            Record* r = up(rcd, sex, name, num, mail);
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        break;
+    case RES_EQ_FIRST: {
+        RecordManager::Location loca;
+        bTree->get(&con.a, &loca);
+        const Record* rcd = rm->get(&loca);
+        Record* r = up(rcd, sex, name, num, mail);
+        bTree->put(&con.a, &loca);
+    } break;
 
-        case RES_HI:
-            t = con.a + 1;
-            it->open(NULL, &t);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                // update
-                Record* r = up(rcd, sex, name, num, mail);
-                rm.set(r, &loc);
-                it->set(&loc);
-            } while (it->next());
-            it->close();
-            break;
-        case RES_LO:
-            it->open(&con.a, NULL);
-            do {
-                RecordManager::Location loc;
-                it->get(NULL, &loc);
-                const Record* rcd = rm.get(&loc);
-                // update
-                Record* r = up(rcd, sex, name, num, mail);
-                rm.set(r, &loc);
-                it->set(&loc);
-            } while (it->next());
-            it->close();
-            break;
-        default:
-            break;
+    case RES_HI:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
+            Record* r = up(rcd, sex, name, num, mail);
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        break;
+    case RES_LO:
+        if (it->open(&con.a, NULL) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
+            Record* r = up(rcd, sex, name, num, mail);
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        break;
+    default:
+        break;
     }
     delete it;
 }

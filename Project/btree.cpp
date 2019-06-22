@@ -10,7 +10,7 @@
 #include "btree.h"
 #include <assert.h>
 #include <cstring>
-#define BTREE_DEBUG
+//#define BTREE_DEBUG
 uint16_t NodeBlock::size() const {
 #ifdef BTREE_DEBUG
     return 4;
@@ -83,9 +83,9 @@ void NodeBlock::insert(const void* key, const void* value, uint16_t index) {
 }
 
 void NodeBlock::set(uint16_t index,
-                    const void* key,
-                    const void* value,
-                    uint8_t flag) {
+    const void* key,
+    const void* value,
+    uint8_t flag) {
     uint8_t* p = kv + index * sizeofkv();
 
     // copy key
@@ -106,7 +106,7 @@ void NodeBlock::split(NodeBlock* nextNode) {
     // move kv
     // [count/2+1, count-1]
     memcpy(nextNode->kv, kv + ((count + 1) / 2) * sizeofkv(),
-           count / 2 * sizeofkv());
+        count / 2 * sizeofkv());
 
     nextNode->count = count / 2;
 
@@ -135,7 +135,7 @@ void NodeBlock::merge(NodeBlock* nextNode) {
 void NodeBlock::remove(uint16_t index) {
     assert(index < count);
     memmove(kv + index * sizeofkv(), kv + (index + 1) * sizeofkv(),
-            sizeofkv() * (count - index - 1));
+        sizeofkv() * (count - index - 1));
     count--;
 }
 
@@ -148,25 +148,25 @@ void NodeBlock::removeByFlag(uint16_t index) {
     set(index, NULL, NULL, 0);
 }
 
-int BTree::Iterator::open(const void* lo, const void* hi) {
+int BTree::Iterator::open(const void* l, const void* h) {
     if (opened)
         return 0;  // the iterator has been opened
 
-    if (lo != NULL && hi != NULL && btree.cmp(lo, hi) >= 0)
+    if (l != NULL && h != NULL && btree.cmp(l, h) >= 0)
         return 0;
     // cpy lo, hi
-    if (lo != NULL) {
+    if (l != NULL) {
         this->lo = malloc(sizeof(btree.keylen));
-        memcpy(this->lo, lo, btree.keylen);
+        memcpy(this->lo, l, btree.keylen);
     }
-    if (hi != NULL) {
+    if (h != NULL) {
         this->hi = malloc(sizeof(btree.keylen));
-        memcpy(this->hi, hi, btree.keylen);
+        memcpy(this->hi, h, btree.keylen);
     }
 
     // locate node
     if (lo != NULL)
-        cur = btree.getLeaf(lo);
+        cur = btree.getLeaf(l);
     else
         cur = btree.getFirstLeaf();
     if (cur == NULL) {
@@ -177,7 +177,7 @@ int BTree::Iterator::open(const void* lo, const void* hi) {
     // locate index
     index = 0;
     if (lo != NULL)
-        index = cur->lub(lo);
+        index = cur->lub(l);
     assert(index != cur->count);
 
     hasNext = true;
@@ -195,9 +195,15 @@ int BTree::Iterator::open(const void* lo, const void* hi) {
 
 void BTree::Iterator::close() {
     if (lo != NULL)
-        free(lo);
+    {
+        lo = NULL;
+        //free(lo);
+    }
     if (hi != NULL)
-        free(hi);
+    {
+        hi = NULL;
+        //free(hi);
+    }
     lo = NULL;
     hi = NULL;
     cur = NULL;
@@ -215,7 +221,8 @@ int BTree::Iterator::next() {
 
     if (index < cur->count - 1) {
         index++;
-    } else if (index == cur->count - 1) {
+    }
+    else if (index == cur->count - 1) {
         // move to the next block
         if (cur->header.next == 0) {
             hasNext = false;
@@ -259,9 +266,9 @@ void BTree::Iterator::remove() {
 }
 
 BTree::BTree(uint8_t keylen,
-             uint8_t vallen,
-             Compare cmp,
-             StorageManager& storage)
+    uint8_t vallen,
+    Compare cmp,
+    StorageManager& storage)
     : keylen(keylen), vallen(vallen), cmp(cmp), storage(storage) {
     if (storage.getIndexOfRoot() == 0) {
         // uint32_t index = 0;
@@ -271,7 +278,8 @@ BTree::BTree(uint8_t keylen,
         }
         storage.setIndexOfRoot(root->header.index);
         root->init(BLOCK_TYPE_LEAF, keylen, vallen);
-    } else {
+    }
+    else {
         root = getBlock(storage.getIndexOfRoot());
         if (root == NULL) {
             // TODO: error
@@ -295,6 +303,7 @@ NodeBlock* BTree::getLeaf(const void* key) {
 
         node = getBlock(*(uint32_t*)(node->getValue(index)));
     }
+    if (node->lub(key) == node->count) return NULL;
     return node;
 }
 
@@ -330,7 +339,7 @@ int BTree::insert(const void* key, const void* value, NodeBlock* cur) {
         // repetition key
         if (index < cur->count && cmp(key, cur->getKey(index)) == 0
             //&& !cur->removed(index)
-        )
+            )
             cur->set(index, NULL, value);
         else
             cur->insert(key, value, index);
