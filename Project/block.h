@@ -68,13 +68,13 @@ struct RecordBlock {
 
     int freeSize();
 
-    int addRecord(Record* record, uint32_t* position);
+    int addRecord(const Record* record, uint16_t* position);
 
-    int delRecord(uint32_t position);
+    int delRecord(uint16_t position);
 
-    Record* getRecord(uint32_t position);
+    Record* getRecord(uint16_t position);
 
-    int updateRecord(uint32_t position, Record* record);
+    int updateRecord(uint16_t position, const Record* record);
 
 };
 #pragma pack()

@@ -15,9 +15,12 @@ static const uint32_t NUM_BLOCK = 16;
 
 StorageManager::StorageManager() : meta(NULL), file(NULL) {}
 
-int StorageManager::create(const char * path) {
-    close();
+StorageManager::StorageManager(const char * path):meta(NULL), file(NULL) {
+    open(path);
+}
 
+int StorageManager::create(const char * path) {
+    //close();
     FILE *file = fopen(path, "w");
     if (file == NULL) return false;
 
@@ -44,7 +47,7 @@ int StorageManager::create(const char * path) {
 }
 
 int StorageManager::open(const char * path) {
-    close();
+    //close();
     file = fopen(path, "r+");
     if (file == NULL) return false;
 
@@ -54,6 +57,7 @@ int StorageManager::open(const char * path) {
     return true;
 }
 
+
 int StorageManager::close() {
     if (file != NULL) {
         save();
@@ -61,6 +65,23 @@ int StorageManager::close() {
         file = NULL;
         for (auto& x : buffers) {
             x.second->header.index = -1;
+        }
+    }
+    return true;
+}
+
+bool StorageManager::save() {
+    for (auto& x : buffers) {
+        if (x.second->header.reserved == 1
+            && x.first == x.second->header.index) {
+            /*if (!file.writeBlock(x.second->header.index, x.second))
+                return false;*/
+            if (fseek(file, x.first*BLOCK_SIZE, SEEK_SET) != 0) return false;
+            x.second->header.reserved = 0;
+            if (fwrite(x.second, BLOCK_SIZE, 1, file) != 1) {
+                x.second->header.reserved = 1;
+                return false;
+            }
         }
     }
     return true;
@@ -76,6 +97,7 @@ StorageManager::~StorageManager() {
 }
 
 void* StorageManager::getBlock(uint32_t index) {
+    if (index != 0 && index >= meta->count) return NULL;
     RecordBlock* block = buffers[index];
     if (block == NULL) {
         block = (RecordBlock*)bufferManager.allocateBlock();
@@ -153,21 +175,6 @@ int StorageManager::freeBlock(uint32_t index) {
     return true;
 }
 
-bool StorageManager::save() {
-    for (auto& x : buffers) {
-        if (x.second->header.reserved == 1) {
-            /*if (!file.writeBlock(x.second->header.index, x.second))
-                return false;*/
-            if (fseek(file, x.first*BLOCK_SIZE, SEEK_SET) != 0) return false;
-            x.second->header.reserved = 0;
-            if (fwrite(x.second, BLOCK_SIZE, 1, file) != 1) {
-                x.second->header.reserved = 1;
-                return false;
-            }
-        }
-    }
-    return true;
-}
 
 uint32_t StorageManager::getIndexOfRoot() {
     return meta->root;
@@ -176,4 +183,63 @@ uint32_t StorageManager::getIndexOfRoot() {
 void StorageManager::setIndexOfRoot(uint32_t i) {
     //assert(i > 0 && i < meta->count);
     meta->root = i;
+}
+
+void RecordManager::nextRoot() {
+    RecordBlock* newRoot = (RecordBlock*)s.getFreeBlock();
+    newRoot->init();
+    newRoot->header.next = root->header.index;
+    root->header.last = newRoot->header.index;
+    s.setIndexOfRoot(newRoot->header.index);
+}
+
+RecordManager::RecordManager(StorageManager & s) :s(s) {
+    if (s.getIndexOfRoot() == 0) {
+        // uint32_t index = 0;
+        root = (RecordBlock*)s.getFreeBlock();
+        if (root == NULL) {
+            // TODO: error
+        }
+        s.setIndexOfRoot(root->header.index);
+        root->init();
+    }
+    else {
+        root = (RecordBlock*)s.getBlock(s.getIndexOfRoot());
+        if (root == NULL) {
+            // TODO: error
+        }
+    }
+}
+
+int RecordManager::put(const Record * rcd, Location * loc) {
+    if (!root->addRecord(rcd, &loc->position)) {
+        nextRoot();
+        int res = root->addRecord(rcd, &loc->position);
+        assert(res == 1);
+        return res;
+    }
+    return 1;
+}
+
+int RecordManager::set(const Record * newRcd, Location * loc) {
+    RecordBlock *block = (RecordBlock*)s.getBlock(loc->index);
+    if (!block->updateRecord(loc->position, newRcd)) {
+        block->delRecord(loc->position);
+        if (put(newRcd, loc))
+            return 2;
+
+        return 0;
+    }
+    return 1;
+}
+
+int RecordManager::del(const Location * loc) {
+    RecordBlock *block = (RecordBlock*)s.getBlock(loc->index);
+    block->delRecord(loc->position);
+    return 1;
+}
+
+const Record* RecordManager::get(const Location * loc) {
+    RecordBlock *block = (RecordBlock*)s.getBlock(loc->index);
+    return block->getRecord(loc->position);
 }

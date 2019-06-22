@@ -33,9 +33,9 @@ public:
             // add multi records
             int len = 300;
             for (int i = 0; i < len; i++) {
-                uint32_t pos;
+                uint16_t pos;
                 Assert::AreEqual(1, block->addRecord((Record*)data, &pos));
-                Assert::AreEqual((uint32_t)i, pos);
+                Assert::AreEqual(i, (int)pos);
             }
             // count
             Assert::AreEqual(len, (int)block->count);

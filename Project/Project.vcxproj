@@ -119,6 +119,7 @@
     <ClInclude Include="block.h" />
     <ClInclude Include="btree.h" />
     <ClInclude Include="buffer.h" />
+    <ClInclude Include="matu.h" />
     <ClInclude Include="storage.h" />
   </ItemGroup>
   <ItemGroup>

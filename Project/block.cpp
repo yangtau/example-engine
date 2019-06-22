@@ -41,13 +41,15 @@ void RecordBlock::init() {
     count = 0;
     free = BLOCK_SIZE;
     header.type = BLOCK_TYPE_DATA;
+    header.last = 0;
+    header.next =0;
 }
 
 int RecordBlock::freeSize() {
     return (int)free - ((uint8_t*)&directory[count + 1] - (uint8_t*)this);
 }
 
-int RecordBlock::addRecord(Record* record, uint32_t *position) {
+int RecordBlock::addRecord(const Record* record, uint16_t *position) {
     if (record->size > freeSize()) {
         return false;
     }
@@ -61,7 +63,7 @@ int RecordBlock::addRecord(Record* record, uint32_t *position) {
     return true;
 }
 
-int RecordBlock::delRecord(uint32_t position) {
+int RecordBlock::delRecord(uint16_t position) {
     if (position >= count) {
         return false;
     }
@@ -88,7 +90,7 @@ int RecordBlock::delRecord(uint32_t position) {
     return true;
 }
 
-Record* RecordBlock::getRecord(uint32_t position) {
+Record* RecordBlock::getRecord(uint16_t position) {
     if (position >= count) {
         // todo
         return NULL;
@@ -105,7 +107,7 @@ Record* RecordBlock::getRecord(uint32_t position) {
     return res;
 }
 
-int RecordBlock::updateRecord(uint32_t position, Record* record) {
+int RecordBlock::updateRecord(uint16_t position, const Record* record) {
     Record* old = getRecord(position);  // get the old record
     if (old == NULL) {
         // the position of the old record is false

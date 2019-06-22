@@ -60,7 +60,7 @@ public:
 
         char data[10] = { 8, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
 
-        uint32_t position;
+        uint16_t position;
         block->init();
         Assert::AreEqual(1, block->addRecord((Record*)data, &position));
 

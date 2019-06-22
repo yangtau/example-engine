@@ -20,65 +20,46 @@ typedef int(*Compare)(const void *, const void *);
 
 #pragma pack(1)
 
-struct NodeBlock {
-    BlockHeader header;
-    uint16_t count;
-    uint8_t kv[0]; // key[1]value
-    void init(uint16_t type) {
-        count = 0; header.next = 0;
-        header.last = 0; header.type = type;
-    }
-};
-
-
-class BTree;
 ///
 // @breif
 // node of b+tree
-struct BTreeNode {
+struct NodeBlock {
+    BlockHeader header;
+    uint16_t count;
     uint8_t keylen;
-    uint8_t vallen = 0;
-    NodeBlock *block;
-    BTree &btree;
+    uint8_t vallen;
+    Compare cmp;
+    uint8_t kv[0]; // key[1]value
 
-    BTreeNode(BTree &btree, void *block) :
-        btree(btree),
-        keylen(btree.keylen),
-        block((NodeBlock*)block) {
-        assert(this->block->header.type == BLOCK_TYPE_LEAF
-            || this->block->header.type == BLOCK_TYPE_NODE);
-        if (this->block->header.type == BLOCK_TYPE_LEAF) vallen = btree.vallen;
-        else if (this->block->header.type == BLOCK_TYPE_NODE) vallen = sizeof(uint32_t);
+    void init(uint16_t type, uint8_t keylen, uint8_t vallen) {
+        count = 0; header.next = 0;
+        header.last = 0; header.type = type;
+        this->keylen = keylen;
+        this->vallen = vallen;
     }
 
-    ~BTreeNode() {}
+    void setCmp(Compare c) { cmp = c; }
 
     uint16_t sizeofkv() const {
         return keylen + vallen + 1; // 1bytes for flag
     }
 
-    uint16_t size() const {
-        return (BLOCK_SIZE - sizeof(BlockHeader) - sizeof(uint16_t)) / sizeofkv();
-    }
+    uint16_t size() const;
 
-    int count() const { return block->count; }
 
     bool full() const {
-        assert(block->count <= size());
-        return block->count == size();
+        assert(count <= size());
+        return count == size();
     };
 
     bool empty() const {
-        return block->count == 0;
+        return count == 0;
     }
 
     bool leaf() const {
-        return block->header.type == BLOCK_TYPE_LEAF;
+        return header.type == BLOCK_TYPE_LEAF;
     }
 
-    int next();
-
-    int last();
 
     // return -1 if no such key exists
     int find(const void* key) const;
@@ -94,12 +75,16 @@ struct BTreeNode {
 
     const void* getKey(int index) const;
 
-    void setKey(const void* key, uint16_t index);
-
-    void setValue(const void* value, uint16_t index);
-
+    // insert kv in index, the items after index will be move backward
     void insert(const void* key, const void* value, uint16_t index);
 
+    void insert(const void* key, const void* value) {
+        insert(key, value, lub(key));
+    }
+
+    // if key or value is null, it will remain the origin key or value;
+    // default flag is `1`
+    void set(uint16_t index, const void * key, const void * value, uint8_t flag = 1);
 
     void split(NodeBlock* nextNode);
 
@@ -107,69 +92,76 @@ struct BTreeNode {
     void merge(NodeBlock* nextNode);
 
     void remove(uint16_t index);
+
+    bool removed(uint16_t index) const;
+
+    void removeByFlag(uint16_t index);
+
+    // TODO: compare with key 
 };
 
 #pragma pack()
 
 
-class BTreeIterator {
-    BTreeNode *cur = NULL;
-    int index = -1;
-    BTree &btree;
-    void *lo = NULL;
-    void *hi = NULL;
-
-
-    BTreeIterator(BTree &bt) : btree(bt) {}
-
-    ~BTreeIterator() {
-        if (lo != NULL) free(lo);
-        if (hi != NULL) free(hi);
-        if (cur != NULL) delete cur;
-    }
-    int open(const void *lo, const void *hi);
-
-    void close();
-
-    // return 0 if it ends
-    int next();
-
-    int forward();
-
-    void set(void *value);
-
-    void get(void *key, void *value) const;
-
-    // remove by flag
-    void remove();
-};
-
-
 
 class BTree {
     friend class BTreeIterator;
-    friend class BTreeNode;
+public:
+    class Iterator {
+        NodeBlock *cur = NULL;
+        int index = -1;
+        BTree &btree;
+        void *lo = NULL;
+        void *hi = NULL;
+        bool hasNext = false;
+        bool opened = false;
+    public:
+        Iterator(BTree &bt) : btree(bt) {}
+
+        ~Iterator() {
+            close();
+        }
+
+        // [lo, hi)
+        // after iter opened, it will pointe at `lo` or item bigger than `lo`
+        // lo and hi can be null
+        int open(const void *lo, const void *hi);
+
+        void close();
+
+        // return 0 if it ends
+        int next();
+
+        void set(void *value);
+
+        void get(void *key, void *value) const;
+
+        // remove by flag
+        void remove();
+    };
 
 private:
     StorageManager &storage;
-    BTreeNode* root = NULL;
+    NodeBlock* root = NULL;
     const uint8_t keylen;
     const uint8_t vallen;
 
     const Compare cmp;
 
-    BTreeNode* getLeaf(const void *key);
+    NodeBlock* getLeaf(const void *key);
 
-    BTreeNode* getNode(uint32_t index);
+    NodeBlock *getFirstLeaf();
 
-    int insert(const void* key, const void* value, BTreeNode* cur);
+    NodeBlock* getBlock(uint32_t index);
+
+    NodeBlock* getFreeBlock();
+
+    int insert(const void* key, const void* value, NodeBlock* cur);
 
 public:
     BTree(uint8_t keylen, uint8_t vallen, Compare cmp, StorageManager &storage);
 
-    ~BTree() {
-        if (root != NULL) delete root;
-    }
+    ~BTree() {}
 
     int put(const void* key, const void* value);
 
@@ -182,6 +174,5 @@ public:
     // `lo` or `hi` can be NULL;
     // if `lo` is NULL, it will start from the first items;
     // if `hi` is NULL, it will end in the last item;
-
-    BTreeIterator iterator();
+    Iterator *iterator();
 };

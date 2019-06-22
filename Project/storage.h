@@ -19,7 +19,7 @@
 // storage manager
 class StorageManager {
 private:
-    
+
     std::map<uint32_t, RecordBlock *> buffers;
 
     BufferManager bufferManager;
@@ -28,9 +28,10 @@ private:
 
     FILE *file;
 
-    
+
 public:
-    explicit StorageManager();
+    StorageManager();
+    StorageManager(const char *path);
 
     int create(const char *path);
 
@@ -53,4 +54,23 @@ public:
     uint32_t getIndexOfRoot();
 
     void setIndexOfRoot(uint32_t);
+};
+
+class RecordManager {
+private:
+    StorageManager &s;
+    RecordBlock *root;
+    void nextRoot();
+public:
+    struct Location {
+        uint32_t index; // index of block
+        uint16_t position; // position in block
+    };
+    RecordManager(StorageManager &s);
+    int put(const Record*rcd, Location*loc);
+
+    // if loc is updated, return 2
+    int set(const Record* newRcd, Location *loc);
+    int del(const Location *loc);
+    const Record* get(const Location *loc);
 };
