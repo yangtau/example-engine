@@ -190,10 +190,10 @@ void testM2()
 int main() {
     auto start = clock();
     testM1();
-    testM2();
-    testM3();
+    //testM2();
+    //testM3();
     auto end = clock();
     std::cout << "Time: " << (end - start)*1.0 / CLOCKS_PER_SEC << std::endl;
-    system("pause");
+    //system("pause");
     return 0;
 }

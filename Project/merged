@@ -1,0 +1,2223 @@
+/*-- File: main.cpp start --*/
+#define _CRT_SECURE_NO_WARNINGS
+#include <iostream>
+#include <ctime>
+/*-- #include "matu.h" start --*/
+#include <assert.h>
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <vector>
+/*-- #include "block.h" start --*/
+////
+// @file block.h
+// @brief
+// block
+//
+// @author yangtao
+// @email yangtaojay@gmail.com
+
+#include <inttypes.h>
+// Block type
+#define BLOCK_TYPE_FREE 0  // free block
+#define BLOCK_TYPE_DATA 1  // data block
+#define BLOCK_TYPE_META 2  // metadata block
+#define BLOCK_TYPE_LEAF 3  // leaf  block
+#define BLOCK_TYPE_NODE 4  // interior node block or root block
+#define BLOCK_TYPE_LOG 5   // log block
+
+#define MAGIC_NUM 0x1ef0c6c1
+
+const uint32_t BLOCK_SIZE = 4096;
+
+#pragma pack(1)
+//
+//struct RecordHeader {
+//    uint16_t size;       // bytes of data
+//    uint16_t timestamp;  // TODO: size of timestamp
+//};
+
+
+///
+// @brief
+// header of block
+// 12
+struct BlockHeader {
+    uint32_t magic;
+    uint16_t type : 3;  // type of block
+    uint16_t reserved : 13;
+    uint16_t checksum;
+    uint32_t index;  // index of this block
+    uint32_t next; // index of next block
+    uint32_t last;
+
+    uint16_t compute();  // compute checksum and set it
+    int check();         // check checksum
+};
+
+
+struct Record {
+    uint16_t size; // size of the record
+    uint8_t data[1];
+};
+
+
+
+///
+// @brief
+// record block
+// 12 + 8
+struct RecordBlock {
+    BlockHeader header;
+    uint16_t count; // the number of records in this block
+    uint16_t free; // 
+
+    uint16_t directory[0];
+ 
+    void init();
+
+    int freeSize();
+
+    int addRecord(const Record* record, uint16_t* position);
+
+    int delRecord(uint16_t position);
+
+    Record* getRecord(uint16_t position);
+
+    int updateRecord(uint16_t position, const Record* record);
+
+};
+#pragma pack()
+
+
+///
+// @brief
+// metadata blcok
+struct MetaBlock {
+    BlockHeader header;
+    uint32_t free;      // the index of first free block
+    uint32_t root;      // root of b+tree
+    uint32_t count;     // num of blocks
+};
+/*-- #include "btree.h" start --*/
+////
+// @file btree.h
+// @breif
+// B+tree
+//
+// @author yangtao
+// @email yangtaojay@gamil.com
+//
+
+
+#include <inttypes.h>
+//#include <vector>
+#include <assert.h>
+/*-- #include "block.h" start --*/
+/*-- #include "storage.h" start --*/
+////
+// @file storage.h
+// @brief
+// storage manager
+// 
+// @author yangtao
+// @email yangtaojay@gmail.com
+//
+
+
+/*-- #include "block.h" start --*/
+/*-- #include "buffer.h" start --*/
+////
+// @file buffer.h
+// @brief
+// buffer manager
+// 
+// @author yangtao
+// @email yangtaojay@gmail.com
+// 
+
+
+class BufferManager {
+
+public:
+    void *allocateBlock();
+    void freeBlock(void*);
+};
+
+
+#include <map>
+
+
+///
+// @brief
+// storage manager
+class StorageManager {
+private:
+
+    std::map<uint32_t, RecordBlock *> buffers;
+
+    BufferManager bufferManager;
+
+    MetaBlock *meta;
+
+    FILE *file;
+
+
+public:
+    StorageManager();
+    StorageManager(const char *path);
+
+    int create(const char *path);
+
+    int open(const char *path);
+
+    int close();
+
+    ~StorageManager();
+
+    void *getBlock(uint32_t index);
+
+    //const void *readBlock(uint32_t index);
+
+    void* getFreeBlock();
+
+    int freeBlock(uint32_t index);
+
+    bool save();
+
+    uint32_t getIndexOfRoot();
+
+    void setIndexOfRoot(uint32_t);
+};
+
+class RecordManager {
+private:
+    StorageManager &s;
+    RecordBlock *root;
+    void nextRoot();
+public:
+    struct Location {
+        uint32_t index; // index of block
+        uint16_t position; // position in block
+    };
+    RecordManager(StorageManager &s);
+    int put(const Record*rcd, Location*loc);
+
+    // if loc is updated, return 2
+    int set(const Record* newRcd, Location *loc);
+    int del(const Location *loc);
+    const Record* get(const Location *loc);
+};
+
+
+typedef int(*Compare)(const void *, const void *);
+
+#pragma pack(1)
+
+///
+// @breif
+// node of b+tree
+struct NodeBlock {
+    BlockHeader header;
+    uint16_t count;
+    uint8_t keylen;
+    uint8_t vallen;
+    Compare cmp;
+    uint8_t kv[0]; // key[1]value
+
+    void init(uint16_t type, uint8_t keylen, uint8_t vallen) {
+        count = 0; header.next = 0;
+        header.last = 0; header.type = type;
+        this->keylen = keylen;
+        this->vallen = vallen;
+    }
+
+    void setCmp(Compare c) { cmp = c; }
+
+    uint16_t sizeofkv() const {
+        return keylen + vallen + 1; // 1bytes for flag
+    }
+
+    uint16_t size() const;
+
+
+    bool full() const {
+        assert(count <= size());
+        return count == size();
+    };
+
+    bool empty() const {
+        return count == 0;
+    }
+
+    bool leaf() const {
+        return header.type == BLOCK_TYPE_LEAF;
+    }
+
+
+    // return -1 if no such key exists
+    int find(const void* key) const;
+
+    // least upper bound
+    // return `count` if `key` is bigger than all items in the block
+    int lub(const void *key) const;
+
+    const void* maxKey() const;
+
+    // value in kv[index]
+    const void* getValue(int index) const;
+
+    const void* getKey(int index) const;
+
+    // insert kv in index, the items after index will be move backward
+    void insert(const void* key, const void* value, uint16_t index);
+
+    void insert(const void* key, const void* value) {
+        insert(key, value, lub(key));
+    }
+
+    // if key or value is null, it will remain the origin key or value;
+    // default flag is `1`
+    void set(uint16_t index, const void * key, const void * value, uint8_t flag = 1);
+
+    void split(NodeBlock* nextNode);
+
+    // merge `nextNode` with this block
+    void merge(NodeBlock* nextNode);
+
+    void remove(uint16_t index);
+
+    bool removed(uint16_t index) const;
+
+    void removeByFlag(uint16_t index);
+
+    // TODO: compare with key 
+};
+
+#pragma pack()
+
+
+
+class BTree {
+    friend class BTreeIterator;
+public:
+    class Iterator {
+        NodeBlock *cur = NULL;
+        int index = -1;
+        BTree &btree;
+        void *lo = NULL;
+        void *hi = NULL;
+        bool hasNext = false;
+        bool opened = false;
+    public:
+        Iterator(BTree &bt) : btree(bt) {
+        }
+
+        ~Iterator() {
+            close();
+        }
+
+        // [lo, hi)
+        // after iter opened, it will pointe at `lo` or item bigger than `lo`
+        // lo and hi can be null
+        int open(const void *lo, const void *hi);
+
+        void close();
+
+        // return 0 if it ends
+        int next();
+
+        void set(void *value);
+
+        void get(void *key, void *value) const;
+
+        // remove by flag
+        void remove();
+    };
+
+private:
+    StorageManager &storage;
+    NodeBlock* root = NULL;
+    const uint8_t keylen;
+    const uint8_t vallen;
+
+    const Compare cmp;
+
+    NodeBlock* getLeaf(const void *key);
+
+    NodeBlock *getFirstLeaf();
+
+    NodeBlock* getBlock(uint32_t index);
+
+    NodeBlock* getFreeBlock();
+
+    int insert(const void* key, const void* value, NodeBlock* cur);
+
+public:
+    BTree(uint8_t keylen, uint8_t vallen, Compare cmp, StorageManager &storage);
+
+    ~BTree() {}
+
+    int put(const void* key, const void* value);
+
+    int get(const void* key, void* value);
+
+    int remove(const void *key);
+
+
+    // range query
+    // `lo` or `hi` can be NULL;
+    // if `lo` is NULL, it will start from the first items;
+    // if `hi` is NULL, it will end in the last item;
+    Iterator *iterator();
+};
+
+/*-- #include "buffer.h" start --*/
+/*-- #include "storage.h" start --*/
+using std::max;
+using std::min;
+
+using std::string;
+using std::vector;
+
+struct RowData {
+    int id;
+    bool sex;
+    string name;
+    string number;
+    string email;
+};
+
+Record* encode(const RowData& data) {
+    uint16_t nameLen = data.name.size();
+    uint16_t numLen = data.number.size();
+    uint16_t emailLen = data.email.size();
+    Record* r = (Record*)malloc(16 + nameLen + emailLen + numLen);
+    r->size = 16 + nameLen + emailLen + numLen;
+    uint8_t* p = (uint8_t*)r->data;
+    *(uint16_t*)p = nameLen;
+    p += 2;
+    *(uint16_t*)p = numLen;
+    p += 2;
+    *(uint16_t*)p = emailLen;
+
+    p += 2;
+    *(int*)p = data.id;
+    p += 4;
+    *p = data.sex;
+    p += 1;
+
+    memcpy(p, data.name.c_str(), nameLen);
+    p += nameLen;
+    *p = '\0';
+    p++;
+
+    memcpy(p, data.number.c_str(), numLen);
+    p += numLen;
+    *p = '\0';
+    p++;
+
+    memcpy(p, data.email.c_str(), emailLen);
+    p += emailLen;
+    *p = '\0';
+    return r;
+}
+
+RowData decode(const Record* record) {
+    RowData data;
+    const uint8_t* p = record->data;
+    uint16_t nameLen = *(uint16_t*)p;
+    uint16_t numLen = *(uint16_t*)(p + 2);
+    uint16_t emailLen = *(uint16_t*)(p + 4);
+    data.id = *(int*)(p + 6);
+    data.sex = *(uint8_t*)(p + 10);
+
+    data.name = (char*)(p + 11);
+
+    data.number = (char*)(p + 12 + nameLen);
+
+    data.email = (char*)(p + 13 + numLen + nameLen);
+    return data;
+}
+
+enum Op {
+    OP_EQ,  // =
+    OP_GE,  // >
+    OP_LE,  // <
+};
+
+enum ResFlag {
+    RES_BAD,       // none
+    RES_EQ_FIRST,  // a
+    RES_HI,        // (-, a]
+    RES_LO,        // [a, +)
+    RES_EQ_BOTH,   // a or b
+    RES_AND,       // [a, b]
+    RES_OR,        // (-, a] or [b, +)
+    RES_EQ_LO,     // a or [b, +)
+    RES_EQ_HI,     // a or  (-, b]
+    RES_ALL,       // all
+};
+
+static int str2int(const string& str, int i = 0) {
+    int res = 0;
+    while (str[i] < '0' || str[i] > '9')
+        i++;
+    while (str[i] >= '0' && str[i] <= '9') {
+        res = res * 10 + str[i] - '0';
+        i++;
+    }
+    return res;
+}
+
+const int INVALID_MARK = -98477777;
+
+struct Condition {
+    int a, b;
+    ResFlag flag;
+};
+
+static Condition conditionParse(const string& sql, int start = 0) {
+    int len = sql.length();
+    Op op;  // first op
+    Condition res;
+    int num;  // first num
+    start++;
+    for (; start < len; start++) {
+        if (sql[start - 1] == ' ' && sql[start] == 'w' &&
+            sql[start + 1] == 'h' && sql[start + 2] == 'e' &&
+            sql[start + 3] == 'r' && sql[start + 4] == 'e' &&
+            sql[start + 5] == ' ') {
+            start += 5;
+            break;
+        }
+    }
+    for (; start < len; start++) {
+        if (sql[start] == '>') {
+            op = OP_GE;
+            num = str2int(sql, start) + (sql[start + 1] == '=' ? 0 : 1);
+            res.a = num;
+            res.flag = RES_LO;
+            break;
+        }
+        else if (sql[start] == '=') {
+            op = OP_EQ;
+            num = str2int(sql, start);
+            res.a = num;
+            res.flag = RES_EQ_FIRST;
+            break;
+        }
+        else if (sql[start] == '<') {
+            op = OP_LE;
+            num = str2int(sql, start) - (sql[start + 1] == '=' ? 0 : 1);
+            res.a = num;
+            res.flag = RES_HI;
+            break;
+        }
+    }
+
+    int conn = -1;  // 1 -> and, 0 -> or
+    // find connective
+    while (start < len && (sql[start] != 'a' && sql[start] != 'o'))
+        start++;
+    if (start < len) {
+        if (sql[start] == 'a' && sql[start + 1] == 'n' && sql[start + 2] == 'd')
+            conn = 1;
+        else if (sql[start] == 'o' && sql[start + 1] == 'r')
+            conn = 0;
+    }
+
+    if (conn != -1)
+        for (; start < len; start++) {
+            int x;
+            if (sql[start] == '>') {
+                x = str2int(sql, start) + (sql[start + 1] == '=' ? 0 : 1);
+                if (op == OP_GE) {
+                    if (conn == 1) {
+                        // >=num and >=x
+                        num = max(num, x);
+                    }
+                    else if (conn == 0) {
+                        // >=num or >=x
+                        num = min(num, x);
+                    }
+                    res.a = num;
+                    res.flag = RES_LO;
+                }
+                else if (op == OP_EQ) {
+                    if (conn == 1) {
+                        // =num and >=x
+                        if (num < x) {
+                            res.flag = RES_BAD;
+                        }
+                        else {
+                            res.a = num;
+                            res.flag = RES_EQ_FIRST;
+                        }
+                    }
+                    else if (conn == 0) {
+                        // = num or >=x
+                        if (num >= x) {
+                            res.a = x;
+                            res.flag = RES_LO;
+                        }
+                        else {
+                            res.a = num;
+                            res.b = x;
+                            res.flag = RES_EQ_LO;
+                        }
+                    }
+                }
+                else if (op == OP_LE) {
+                    if (conn == 1) {
+                        // <=num and >=x
+                        if (x > num) {
+                            res.flag = RES_BAD;
+                        }
+                        else if (x == num) {
+                            res.a = x;
+                            res.flag = RES_EQ_FIRST;
+                        }
+                        else {
+                            res.a = x;
+                            res.b = num;
+                            res.flag = RES_AND;
+                        }
+                    }
+                    else if (conn == 0) {
+                        // <=num or >=x
+                        if (x <= num + 1) {
+                            res.flag = RES_ALL;
+                        }
+                        else {
+                            res.a = num;
+                            res.b = x;
+                            res.flag = RES_OR;
+                        }
+                    }
+                }
+                break;
+            }
+            else if (sql[start] == '=') {
+                x = str2int(sql, start);
+                if (op == OP_EQ) {
+                    if (conn == 1) {  // and
+                        if (x == num) {
+                            res.a = x;
+                            res.flag = RES_EQ_FIRST;
+                        }
+                        else {
+                            res.flag = RES_BAD;
+                        }
+                    }
+                    else if (conn == 0) {  // or
+                        if (x == num) {
+                            res.a = x;
+                            res.flag = RES_EQ_FIRST;
+                        }
+                        else {
+                            res.a = x;
+                            res.b = num;
+                            res.flag = RES_EQ_BOTH;
+                        }
+                    }
+                }
+                else if (op == OP_GE) {
+                    if (conn == 1) {  // and
+                        // >=num  and =x
+                        if (num > x) {
+                            res.flag = RES_BAD;
+                        }
+                        else {
+                            res.a = x;
+                            res.flag = RES_EQ_FIRST;
+                        }
+                    }
+                    else if (conn == 0) {  // or
+                                          // >=num or =x
+                        if (x >= num) {
+                            res.a = num;
+                            res.flag = RES_LO;
+                        }
+                        else {
+                            res.a = x;
+                            res.b = num;
+                            res.flag = RES_EQ_LO;
+                        }
+                    }
+                }
+                else if (op == OP_LE) {
+                    if (conn == 1) {  // and
+                        // <=num and =x
+                        if (x > num) {
+                            res.flag = RES_BAD;
+                        }
+                        else {
+                            res.a = num;
+                            res.flag = RES_EQ_FIRST;
+                        }
+                    }
+                    else if (conn == 0) {  // or
+                                          // <=num or =x
+                        if (x > num) {
+                            res.a = x;
+                            res.b = num;
+                            res.flag = RES_EQ_HI;
+                        }
+                        else {
+                            res.a = num;
+                            res.flag = RES_HI;
+                        }
+                    }
+                }
+                break;
+            }
+            else if (sql[start] == '<') {
+                x = str2int(sql, start) - (sql[start + 1] == '=' ? 0 : 1);
+                if (op == OP_GE) {
+                    if (conn == 1) {  // and
+                        // >=num and <=x
+                        if (x < num) {
+                            res.flag = RES_BAD;
+                        }
+                        else if (x == num) {
+                            res.a = x;
+                            res.flag = RES_EQ_FIRST;
+                        }
+                        else {
+                            res.a = num;
+                            res.b = x;
+                            res.flag = RES_AND;
+                        }
+                    }
+                    else if (conn == 0) {  // or
+                                          // >=num or <=x
+                        if (x + 1 >= num) {
+                            res.flag = RES_ALL;
+                        }
+                        else {
+                            res.a = x;
+                            res.b = num;
+                            res.flag = RES_OR;
+                        }
+                    }
+                }
+                else if (op == OP_EQ) {
+                    if (conn == 1) {  // and
+                        // =num and <=x
+                        if (num > x) {
+                            res.flag = RES_BAD;
+                        }
+                        else {
+                            res.a = num;
+                            res.flag = RES_EQ_FIRST;
+                        }
+                    }
+                    else if (conn == 0) {  // or
+                                          // =num OR <=x
+                        if (num > x) {
+                            res.a = num;
+                            res.b = x;
+                            res.flag = RES_EQ_HI;
+                        }
+                        else {
+                            res.a = x;
+                            res.flag = RES_HI;
+                        }
+                    }
+                }
+                else if (op == OP_LE) {
+                    if (conn == 1) {  // and
+                        // <= num and <= x
+                        num = min(num, x);
+                    }
+                    else if (conn == 0) {  // or
+                        num = max(num, x);
+                    }
+                    res.a = num;
+                    res.flag = RES_HI;
+                }
+                break;
+            }
+        }
+    return res;
+}
+
+
+
+int cmp(const void* a, const void* b) {
+    return *(int*)a - *(int*)b;
+}
+StorageManager* s = NULL;
+StorageManager* st = NULL;
+BTree* bTree = NULL;
+RecordManager* rm = NULL;
+bool initialized = false;
+void init() {
+    uint8_t keylen = sizeof(int), vallen = sizeof(RecordManager::Location);
+    if (initialized)
+        return;
+    if (s == NULL) {
+        s = new StorageManager();
+        s->open("table.db");
+    }
+    if (st == NULL) {
+        st = new StorageManager();
+        st->open("index.db");
+    }
+
+    if (bTree == NULL)
+        bTree = new BTree(keylen, vallen, cmp, *st);
+    if (rm == NULL)
+        rm = new RecordManager(*s);
+    initialized = true;
+}
+void release() {
+    if (s != NULL) {
+        delete s;
+        s = NULL;
+    }
+    if (st != NULL) {
+        delete st;
+        st = NULL;
+    }
+    if (bTree != NULL) {
+        delete bTree;
+        bTree = NULL;
+    }
+    if (rm != NULL) {
+        delete rm;
+        rm = NULL;
+    }
+}
+
+void initial() {
+    uint8_t keylen = sizeof(int), vallen = sizeof(RecordManager::Location);
+    s = new StorageManager();
+    s->create("table.db");
+    s->open("table.db");
+    st = new StorageManager();
+    st->create("index.db");
+    st->open("index.db");
+
+    if (bTree == NULL)
+        bTree = new BTree(keylen, vallen, cmp, *st);
+    if (rm == NULL)
+        rm = new RecordManager(*s);
+
+    atexit(release);
+    initialized = true;
+}
+
+void insert(RowData& data) {
+    Record* rcd = encode(data);
+    RecordManager::Location loc;
+    rm->put(rcd, &loc);
+    free(rcd);
+    bTree->put(&data.id, &loc);
+}
+
+void insert(std::vector<RowData> rows) {
+    init();
+    for (auto& r : rows) {
+        insert(r);
+    }
+}
+
+std::vector<RowData> query(string sql) {
+    init();
+    atexit(release);
+    vector<RowData> res;
+    // vector<RecordManager::Location> r;
+
+    Condition con = conditionParse(sql);
+    BTree::Iterator* it = bTree->iterator();
+    int t;
+    switch (con.flag) {
+    case RES_AND:
+        t = con.b + 1;
+        if (it->open(&con.a, &t) == 0) break;
+
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        break;
+    case RES_OR:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        if (it->open(&con.b, NULL) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        break;
+    case RES_EQ_FIRST: {
+        RecordManager::Location loca;
+        bTree->get(&con.a, &loca);
+        const Record* rcd = rm->get(&loca);
+        res.push_back(decode(rcd));
+    } break;
+
+    case RES_HI:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        break;
+    case RES_LO:
+        if (it->open(&con.a, NULL) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            res.push_back(decode(rcd));
+        } while (it->next());
+        it->close();
+        break;
+    default:
+        break;
+    }
+    delete it;
+    return res;
+}
+
+void del(string sql) {
+    init();
+    Condition con = conditionParse(sql);
+    BTree::Iterator* it = bTree->iterator();
+    int t;
+    switch (con.flag) {
+    case RES_AND:
+        t = con.b + 1;
+        if (it->open(&con.a, &t) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        break;
+    case RES_OR:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        if (it->open(&con.b, NULL) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        break;
+    case RES_EQ_FIRST:
+        RecordManager::Location loca;
+        bTree->remove(&con.a);
+        break;
+
+    case RES_HI:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        break;
+    case RES_LO:
+        if (it->open(&con.a, NULL) == 0) break;
+        do {
+            it->remove();
+        } while (it->next());
+        it->close();
+        break;
+    default:
+        break;
+    }
+    delete it;
+}
+
+Record* up(const Record* rcd, int sex, string name, string num, string mail) {
+    RowData t = decode(rcd);
+
+    if (sex != -1) {
+        t.sex = sex;
+    }
+    if (name != "") {
+        t.name = name;
+    }
+    if (num != "") {
+        t.number = num;
+    }
+    if (mail != "") {
+        t.email = mail;
+    }
+    return encode(t);
+}
+
+void update(string sql) {
+    init();
+    int sex = -1;
+    string num = "", mail = "", name = "";
+
+    int i;
+
+    for (i = 0; i < sql.size(); i++)
+        if (sql[i] == 's' && sql[i + 1] == 'e')
+            break;
+    i += 3;
+    while (sql[i] == ' ')
+        i++;
+    if (sql[i] == 's') {
+        // sex
+        while (sql[i] != '=')
+            i++;
+        i++;
+        sex = str2int(sql.substr(i));
+    }
+    else if (sql[i] == 'e') {
+        // email
+        while (sql[i] != '=')
+            i++;
+        i++;
+        while (sql[i] == ' ')
+            i++;
+        int j = i + 1;
+        while (sql[j] != ' ')
+            j++;
+        mail = sql.substr(i, j - i);
+    }
+    else if (sql[i] == 'n' && sql[i + 1] == 'a') {
+        // name
+        while (sql[i] != '=')
+            i++;
+        i++;
+        while (sql[i] == ' ')
+            i++;
+        int j = i + 1;
+        while (sql[j] != ' ')
+            j++;
+        name = sql.substr(i, j - i);
+    }
+    else if (sql[i] == 'n' && sql[i + 1] == 'u') {
+        // number
+        while (sql[i] != '=')
+            i++;
+        i++;
+        while (sql[i] == ' ')
+            i++;
+        int j = i + 1;
+        while (sql[j] != ' ')
+            j++;
+        num = sql.substr(i, j - i);
+    }
+
+    Condition con = conditionParse(sql);
+    BTree::Iterator* it = bTree->iterator();
+    int t;
+    switch (con.flag) {
+    case RES_AND:
+        t = con.b + 1;
+        if (it->open(&con.a, &t) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
+            Record* r = up(rcd, sex, name, num, mail);
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        break;
+    case RES_OR:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
+            Record* r = up(rcd, sex, name, num, mail);
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        if (it->open(&con.b, NULL) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
+            Record* r = up(rcd, sex, name, num, mail);
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        break;
+    case RES_EQ_FIRST: {
+        RecordManager::Location loca;
+        bTree->get(&con.a, &loca);
+        const Record* rcd = rm->get(&loca);
+        Record* r = up(rcd, sex, name, num, mail);
+        bTree->put(&con.a, &loca);
+    } break;
+
+    case RES_HI:
+        t = con.a + 1;
+        if (it->open(NULL, &t) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
+            Record* r = up(rcd, sex, name, num, mail);
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        break;
+    case RES_LO:
+        if (it->open(&con.a, NULL) == 0) break;
+        do {
+            RecordManager::Location loc;
+            it->get(NULL, &loc);
+            const Record* rcd = rm->get(&loc);
+            // update
+            Record* r = up(rcd, sex, name, num, mail);
+            rm->set(r, &loc);
+            it->set(&loc);
+        } while (it->next());
+        it->close();
+        break;
+    default:
+        break;
+    }
+    delete it;
+}
+
+#include <vector>
+#include <string>
+#include <windows.h>
+#include <fstream>
+#include <iostream>
+#include <ctime>
+using namespace std;
+
+void initial();
+void insert(std::vector<RowData> rows);//插入数据默认按照主键升序
+std::vector<RowData> query(string sql); //查询数据默认按照主键升序
+void del(string sql);
+void update(string sql);
+int cmd = 0;
+//
+//bool CheckFile(string fileName) {
+//    ifstream file(fileName, ios::binary | ios::in);
+//    if (!file.is_open())
+//        return false;
+//    file.seekg(0, ios::beg);
+//    char result[4] = { 0xc1,0xc6,0xf0,0x1e };
+//    while (file.good()) {
+//        char buff[4];
+//        if (file.read(buff, sizeof(buff))) {
+//            if (strncmp(buff, result, sizeof(buff)) != 0) {
+//                return false;
+//            }
+//        }
+//        file.seekg(4092, ios::cur);
+//    }
+//    file.close();
+//    return true;
+//}
+//
+//void testM1() {
+//    initial();
+//
+//    for (int i = 0; i < 10000; i++) {
+//        vector<RowData> rowDatas;
+//        RowData rowData;
+//        rowData.id = i;
+//        rowData.name = string("ccg").append(to_string(i));
+//        rowData.number = string("20190603").append(to_string(i));
+//        rowData.sex = true;
+//        rowData.email = string("20190603@").append(to_string(i)).append(".com");
+//        rowDatas.push_back(rowData);
+//        insert(rowDatas);
+//    }
+//
+//    if (!CheckFile("table.db")) {
+//        printf("wrong\n");
+//        return;
+//    }
+//    vector<RowData> result = query("select * from table where id > 500 and id <999");
+//    bool flag = true;
+//    for (int i = 501; i < 999; i++) {
+//        RowData rowData = result.front();
+//        result.erase(result.begin());
+//        if (rowData.id != i) {
+//            flag = false;
+//            break;
+//        }
+//        if (rowData.name.compare(string("ccg").append(to_string(i))) != 0) {
+//            flag = false;
+//            break;
+//        }
+//        if (rowData.number.compare(string("20190603").append(to_string(i))) != 0) {
+//            flag = false;
+//            break;
+//        }
+//        if (!rowData.sex) {
+//            flag = false;
+//            break;
+//        }
+//        if (rowData.email.compare(string("20190603@").append(to_string(i)).append(".com")) != 0) {
+//            flag = false;
+//            break;
+//        }
+//    }
+//    //del("delete from table where id > 2956 and id < 7854");
+//    if (flag == false) {
+//        printf("wrong\n");
+//    }
+//    else
+//        printf("yes\n");
+//}
+//
+//void testM3() {
+//    update("update table set number = 20190603x where id<50 or id>9950");
+//    vector<RowData> rowDatas = query("select * from table where id<50 or id>9950");
+//    if (rowDatas.size() != 99) {
+//        printf("wrong\n");
+//        return;
+//    }
+//    for (vector<RowData>::iterator it = rowDatas.begin(); it != rowDatas.end(); it++) {
+//        if ((*it).number.compare(string("20190603x")) != 0) {
+//            printf("wrong\n");
+//            return;
+//        }
+//    }
+//    if (!CheckFile("table.db")) {
+//        printf("wrong\n");
+//        return;
+//    }
+//    printf("yes\n");
+//    return;
+//}
+//
+//void testM2()
+//{
+//
+//    int flag = true;
+//    del("delete from table where id > 2956 and id < 7854");
+//    vector<RowData> result = query("select * from table where id > 2900 and id <5000");
+//    for (int i = 2901; i < 2957; i++)
+//    //for (int i = 2991; i < 2957; i++)
+//    {
+//        //?:从2901 开始
+//        RowData rowData = result.front();
+//        result.erase(result.begin());
+//        if (rowData.id != i) {
+//            flag = false;
+//            break;
+//        }
+//        if (rowData.name.compare(string("ccg").append(to_string(i))) != 0) {
+//            flag = false;
+//            break;
+//        }
+//        if (rowData.number.compare(string("20190603").append(to_string(i))) != 0) {
+//            flag = false;
+//            break;
+//        }
+//        if (!rowData.sex) {
+//            flag = false;
+//            break;
+//        }
+//        if (rowData.email.compare(string("20190603@").append(to_string(i)).append(".com")) != 0) {
+//            flag = false;
+//            break;
+//        }
+//    }
+//    if (flag == false) {
+//        printf("wrong\n");
+//        return;
+//    }
+//    result = query("select * from table where id > 5000 and id < 7900");
+//    for (int i = 7854; i < 7900; i++) 
+//    //for (int i = 7855; i < 7900; i++) 
+//    {
+//        // ?: 从7854开始
+//        RowData rowData = result.front();
+//        result.erase(result.begin());
+//        if (rowData.id != i) {
+//            flag = false;
+//            break;
+//        }
+//        if (rowData.name.compare(string("ccg").append(to_string(i))) != 0) {
+//            flag = false;
+//            break;
+//        }
+//        if (rowData.number.compare(string("20190603").append(to_string(i))) != 0) {
+//            flag = false;
+//            break;
+//        }
+//        if (!rowData.sex) {
+//            flag = false;
+//            break;
+//        }
+//        if (rowData.email.compare(string("20190603@").append(to_string(i)).append(".com")) != 0) {
+//            flag = false;
+//            break;
+//        }
+//    }
+//    if (flag == false) {
+//        printf("wrong\n");
+//        return;
+//    }
+//
+//    if (!CheckFile("table.db")) {
+//        printf("wrong\n");
+//        return;
+//    }
+//    printf("yes\n");
+//}
+//
+//int main() {
+//    auto start = clock();
+//    //testM1();
+//    //testM2();
+//    //testM3();
+//    auto end = clock();
+//    std::cout << "Time: " << (end - start)*1.0 / CLOCKS_PER_SEC << std::endl;
+//    system("pause");
+//    return 0;
+//}
+
+/*-- File: main.cpp end --*/
+/*-- File: block.cpp start --*/
+////
+// @file block.cpp
+// @brief
+// block
+//
+// @author yangtao
+// @email yangtaojay@gmail.com
+// 
+
+/*-- #include "block.h" start --*/
+#include <cstring>
+
+
+uint16_t BlockHeader::compute() {
+    // the max sum 4094/2 * 2^16 < 2^32
+    uint32_t sum = 0;
+    // Size of block is even, so there is no need to handle odd-sized block
+    for (int i = 0; i < BLOCK_SIZE / 2; i++) {
+        sum += ((uint16_t*)this)[i];  // get two bytes
+    }
+    sum -= this->checksum;  // substract checksum from sum
+    // Fold to get ones-complement result
+    while (sum >> 16) {
+        sum = (sum & 0xffff) + (sum >> 16);
+    }
+    return checksum = ~sum;
+}
+
+int BlockHeader::check() {
+    uint32_t sum = 0;
+    for (int i = 0; i < BLOCK_SIZE / 2; i++) {
+        sum += ((uint16_t*)this)[i];  // get two bytes
+    }
+    while (sum >> 16) {
+        sum = (sum & 0xffff) + (sum >> 16);
+    }
+    return sum == 0xffff;
+}
+
+void RecordBlock::init() {
+    count = 0;
+    free = BLOCK_SIZE;
+    header.type = BLOCK_TYPE_DATA;
+    header.last = 0;
+    header.next =0;
+}
+
+int RecordBlock::freeSize() {
+    return (int)free - ((uint8_t*)&directory[count + 1] - (uint8_t*)this);
+}
+
+int RecordBlock::addRecord(const Record* record, uint16_t *position) {
+    if (record->size > freeSize()) {
+        return false;
+    }
+    RecordBlock::free -= record->size;
+
+    memcpy((uint8_t*)this + free, record, record->size);
+
+    if (position != NULL) *position = RecordBlock::count;
+
+    RecordBlock::directory[RecordBlock::count++] = RecordBlock::free;
+    return true;
+}
+
+int RecordBlock::delRecord(uint16_t position) {
+    if (position >= count) {
+        return false;
+    }
+
+    // a simple implementation
+    directory[position] = 0;
+
+    //uint16_t offset = directory[position];
+    //
+    //if (offset == 0) return false;
+
+    //Record* record = (Record*)((uint8_t*)this + offset);
+    //uint16_t size = record->size;
+    //directory[position] = 0;  // pointer to 0
+    //// move memory, `offset + size - header.free` is the size to move
+    //memmove(record, (uint8_t*)record + size, header.free - offset + size);
+    //header.free -= size;
+    //// modify offset table (tailer)
+    //for (uint16_t i = 0; i < header.count; i++) {
+    //    if (getTailer()->slots[i] > offset) {
+    //        getTailer()->slots[i] -= size;
+    //    }
+    //}
+    return true;
+}
+
+Record* RecordBlock::getRecord(uint16_t position) {
+    if (position >= count) {
+        // todo
+        return NULL;
+    }
+
+    uint16_t offset = directory[position];
+
+    // if the record is removed, the offset is 0
+    if (offset == 0) return NULL;
+
+    Record* res = (Record*)((uint8_t*)this + offset);
+    // res->data = (uint8_t*)this + offset + sizeof(RecordHeader);
+
+    return res;
+}
+
+int RecordBlock::updateRecord(uint16_t position, const Record* record) {
+    Record* old = getRecord(position);  // get the old record
+    if (old == NULL) {
+        // the position of the old record is false
+        return false;
+    }
+
+    if (old->size >= record->size) {
+        //old->header = record->header;
+        memcpy((uint8_t*)old, record, record->size);
+        return true;
+    }
+
+    if (record->size > freeSize()) {
+        // memory is not enough, add to next block
+        return false;
+    }
+
+    delRecord(position);
+
+    // insert
+    RecordBlock::free -= record->size;
+
+    memcpy((uint8_t*)this + free, record, record->size);
+
+    RecordBlock::directory[position] = RecordBlock::free;
+    return true;
+
+    //uint16_t offset = getTailer()->slots[position];
+    //if (offset == 0) return false;
+
+    //uint16_t size = old->size;
+    //// move memory, `offset + size - header.free` is the size to move
+    //memmove(old, (uint8_t*)old + size, header.free - offset - size);
+    //header.free -= size;
+    //// modify offset table (tailer)
+    //for (uint16_t i = 0; i < header.count; i++) {
+    //    if (getTailer()->slots[i] > offset) {
+    //        getTailer()->slots[i] -= size;
+    //    }
+    //}
+    ////memcpy((uint8_t*)this + header.free, record, sizeof(RecordHeader));
+    //// *(RecordHeader*)((uint8_t*)this + header.free) = record->header;
+    //// copy data of record
+    //memcpy((uint8_t*)this + header.free,
+    //    record->data, record->size);
+    //getTailer()->slots[position] = header.free;  // point to new position
+    //header.free += record->size;
+    return true;
+}
+
+
+/*-- File: block.cpp end --*/
+/*-- #include "block.h" start --*/
+/*-- File: btree.cpp start --*/
+////
+// @file btree.cpp
+// @brief
+// B+tree
+//
+// @author yangtao
+// @email yangtaojay@gmail.com
+//
+
+/*-- #include "btree.h" start --*/
+#include <assert.h>
+#include <cstring>
+//#define BTREE_DEBUG
+uint16_t NodeBlock::size() const {
+#ifdef BTREE_DEBUG
+    return 4;
+
+#endif  // BTREE_DEBUG
+    return (BLOCK_SIZE - ((uint8_t*)this - (uint8_t*)kv)) / sizeofkv();
+}
+
+int NodeBlock::find(const void* key) const {
+    int lo = 0;
+    int hi = count;
+    while (lo < hi) {
+        int mid = (lo + hi) / 2;
+        void* p = (uint8_t*)kv + mid * sizeofkv();
+        int res = cmp(p, key);
+        if (res == 0)
+            return mid;
+        else if (res > 0)
+            hi = mid;  // key in kv[mid] is bigger than `key`
+        else
+            lo = mid + 1;
+    }
+    return -1;
+}
+
+int NodeBlock::lub(const void* key) const {
+    int lo = 0;
+    int hi = count;
+    while (lo < hi) {
+        int mid = (lo + hi) / 2;
+        void* p = (uint8_t*)kv + mid * sizeofkv();
+        int res = cmp(p, key);
+        if (res < 0)
+            lo = mid + 1;  // key in kv[mid] is less than `key`
+        else
+            hi = mid;
+    }
+    return lo;
+}
+
+const void* NodeBlock::maxKey() const {
+    return (uint8_t*)kv + (count - 1) * sizeofkv();
+}
+
+const void* NodeBlock::getValue(int index) const {
+    return (uint8_t*)kv + index * sizeofkv() + keylen + 1;
+}
+
+const void* NodeBlock::getKey(int index) const {
+    return (uint8_t*)kv + index * sizeofkv();
+}
+
+void NodeBlock::insert(const void* key, const void* value, uint16_t index) {
+    assert(index <= count);
+    uint8_t* p = kv + (index)*sizeofkv();
+    memmove(p + sizeofkv(), p, sizeofkv() * (count - index));
+
+    // copy key
+    memcpy(p, key, keylen);
+    p += keylen;
+
+    // flag
+    *p = 1;
+    p++;
+
+    // value
+    memcpy(p, value, vallen);
+
+    count++;
+}
+
+void NodeBlock::set(uint16_t index,
+    const void* key,
+    const void* value,
+    uint8_t flag) {
+    uint8_t* p = kv + index * sizeofkv();
+
+    // copy key
+    if (key != NULL)
+        memcpy(p, key, keylen);
+    p += keylen;
+
+    // flag
+    *p = flag;
+    p++;
+
+    // value
+    if (value != NULL)
+        memcpy(p, value, vallen);
+}
+
+void NodeBlock::split(NodeBlock* nextNode) {
+    // move kv
+    // [count/2+1, count-1]
+    memcpy(nextNode->kv, kv + ((count + 1) / 2) * sizeofkv(),
+        count / 2 * sizeofkv());
+
+    nextNode->count = count / 2;
+
+    count = (count + 1) / 2;
+
+    // chain brother
+    // NodeBlock *oldNext = (NodeBlock*)btree.storage.getBlock(header.next);
+    /*nextNode->header.next = header.next;
+    nextNode->header.last = header.index;
+
+    header.next = nextNode->header.index;
+    oldNext->header.last = nextNode->header.index;*/
+}
+
+void NodeBlock::merge(NodeBlock* nextNode) {
+    memcpy(kv + count * sizeofkv(), nextNode->kv, nextNode->count * sizeofkv());
+
+    count += nextNode->count;
+
+    header.next = nextNode->header.next;
+    /*
+        NodeBlock *newNext = (NodeBlock*)btree.storage.getBlock(header.next);
+        newNext->header.last = header.index;*/
+}
+
+void NodeBlock::remove(uint16_t index) {
+    assert(index < count);
+    memmove(kv + index * sizeofkv(), kv + (index + 1) * sizeofkv(),
+        sizeofkv() * (count - index - 1));
+    count--;
+}
+
+bool NodeBlock::removed(uint16_t index) const {
+    uint8_t* p = (uint8_t*)kv + index * sizeofkv() + keylen;
+    return *p == 0;
+}
+
+void NodeBlock::removeByFlag(uint16_t index) {
+    set(index, NULL, NULL, 0);
+}
+
+int BTree::Iterator::open(const void* l, const void* h) {
+    if (opened)
+        return 0;  // the iterator has been opened
+
+    if (l != NULL && h != NULL && btree.cmp(l, h) >= 0)
+        return 0;
+    // cpy lo, hi
+    if (l != NULL) {
+        this->lo = malloc(sizeof(btree.keylen));
+        memcpy(this->lo, l, btree.keylen);
+    }
+    if (h != NULL) {
+        this->hi = malloc(sizeof(btree.keylen));
+        memcpy(this->hi, h, btree.keylen);
+    }
+
+    // locate node
+    if (lo != NULL)
+        cur = btree.getLeaf(l);
+    else
+        cur = btree.getFirstLeaf();
+    if (cur == NULL) {
+        close();
+        return 0;
+    }
+
+    // locate index
+    index = 0;
+    if (lo != NULL)
+        index = cur->lub(l);
+    assert(index != cur->count);
+
+    hasNext = true;
+
+    // check
+    if (cur->removed(index)) {
+        if (next() == 0) {
+            close();
+            return 0;
+        }
+    }
+    opened = true;
+    return 1;
+}
+
+void BTree::Iterator::close() {
+    if (lo != NULL)
+    {
+        lo = NULL;
+        //free(lo);
+    }
+    if (hi != NULL)
+    {
+        hi = NULL;
+        //free(hi);
+    }
+    lo = NULL;
+    hi = NULL;
+    cur = NULL;
+    hasNext = false;
+    opened = false;
+}
+
+int BTree::Iterator::next() {
+    assert(!cur->empty());
+
+    if (!hasNext) {
+        hasNext = false;
+        return 0;
+    }
+
+    if (index < cur->count - 1) {
+        index++;
+    }
+    else if (index == cur->count - 1) {
+        // move to the next block
+        if (cur->header.next == 0) {
+            hasNext = false;
+            return 0;
+        }
+        cur = (NodeBlock*)btree.storage.getBlock(cur->header.next);
+        index = 0;
+    }
+
+    // check the upper bound
+    if (hi != NULL) {
+        // uint8_t* p = cur->kv + index * cur->sizeofkv();
+        if (btree.cmp(cur->getKey(index), hi) >= 0) {  // p>=hi
+            hasNext = false;
+            return 0;
+        }
+    }
+
+    // the key may have been removed
+    if (cur->removed(index))
+        return next();
+    return 1;
+}
+
+void BTree::Iterator::set(void* value) {
+    assert(opened);
+    cur->set(index, NULL, value);
+}
+
+void BTree::Iterator::get(void* key, void* value) const {
+    assert(opened);
+    if (key != NULL)
+        memcpy(key, cur->getKey(index), cur->keylen);
+    if (value != NULL)
+        memcpy(value, cur->getValue(index), cur->vallen);
+}
+
+void BTree::Iterator::remove() {
+    assert(opened);
+    cur->removeByFlag(index);
+}
+
+BTree::BTree(uint8_t keylen,
+    uint8_t vallen,
+    Compare cmp,
+    StorageManager& storage)
+    : keylen(keylen), vallen(vallen), cmp(cmp), storage(storage) {
+    if (storage.getIndexOfRoot() == 0) {
+        // uint32_t index = 0;
+        root = (NodeBlock*)getFreeBlock();
+        if (root == NULL) {
+            // TODO: error
+        }
+        storage.setIndexOfRoot(root->header.index);
+        root->init(BLOCK_TYPE_LEAF, keylen, vallen);
+    }
+    else {
+        root = getBlock(storage.getIndexOfRoot());
+        if (root == NULL) {
+            // TODO: error
+        }
+    }
+}
+
+NodeBlock* BTree::getLeaf(const void* key) {
+    int index = root->lub(key);
+    if (index == root->count)
+        return NULL;
+    if (root->leaf())
+        return root;
+
+    NodeBlock* node = getBlock(*(uint32_t*)(root->getValue(index)));
+
+    while (!node->leaf()) {
+        int index = node->lub(key);
+        if (index == node->count)
+            return NULL;
+
+        node = getBlock(*(uint32_t*)(node->getValue(index)));
+    }
+    if (node->lub(key) == node->count) return NULL;
+    return node;
+}
+
+NodeBlock* BTree::getFirstLeaf() {
+    if (root->empty())
+        return NULL;
+    if (root->leaf())
+        return root;
+    NodeBlock* node = getBlock(*(uint32_t*)root->getValue(0));
+    while (!node->leaf()) {
+        node = getBlock(*(uint32_t*)node->getValue(0));
+    }
+    return node;
+}
+
+NodeBlock* BTree::getBlock(uint32_t index) {
+    NodeBlock* node = (NodeBlock*)storage.getBlock(index);
+    assert(node != NULL);
+    node->setCmp(cmp);
+    return node;
+}
+
+NodeBlock* BTree::getFreeBlock() {
+    NodeBlock* node = (NodeBlock*)storage.getFreeBlock();
+    assert(node != NULL);
+    node->setCmp(cmp);
+    return node;
+}
+
+int BTree::insert(const void* key, const void* value, NodeBlock* cur) {
+    int index = cur->lub(key);
+    if (cur->leaf()) {
+        // repetition key
+        if (index < cur->count && cmp(key, cur->getKey(index)) == 0
+            //&& !cur->removed(index)
+            )
+            cur->set(index, NULL, value);
+        else
+            cur->insert(key, value, index);
+        return 1;
+    }
+
+    // the max key
+    // the key of current node needs to be update only if the flag is true.
+    bool maxKeyFlag = false;
+    if (index == cur->count) {
+        index--;
+        maxKeyFlag = true;
+    }
+
+    // get son
+    uint32_t blockid = *(uint32_t*)cur->getValue(index);
+    NodeBlock* son = getBlock(blockid);
+
+    // insert into son
+    if (insert(key, value, son) == 0) {
+        return 0;
+    }
+
+    // update the key
+    if (maxKeyFlag)
+        cur->set(index, son->maxKey(), NULL);
+
+    if (son->full()) {
+        NodeBlock* next = (NodeBlock*)getFreeBlock();
+        next->init(son->header.type, son->keylen, son->vallen);
+        son->split(next);
+
+        if (son->header.next != 0) {
+            NodeBlock* oldnext = getBlock(son->header.next);
+            oldnext->header.last = next->header.index;
+            next->header.next = son->header.next;
+        }
+
+        son->header.next = next->header.index;
+        next->header.last = son->header.index;
+
+        // max key of `next` is the same with the previous max key
+        // `next` repalce the son in `cur`
+        cur->set(index, NULL, &next->header.index);
+
+        // insert the `son` with the new max key
+        cur->insert(son->maxKey(), &son->header.index);
+    }
+
+    return 1;
+}
+
+int BTree::put(const void* key, const void* value) {
+    if (root->empty()) {
+        root->insert(key, value, 0);
+        return 1;
+    }
+    if (insert(key, value, root) == 0)
+        return 0;
+
+    // split root
+    if (root->full()) {
+        NodeBlock* newRoot = (NodeBlock*)getFreeBlock();  // new root
+        NodeBlock* nextNode =
+            (NodeBlock*)getFreeBlock();  // next node of old root
+
+        // init of new node
+        newRoot->init(BLOCK_TYPE_NODE, keylen, sizeof(uint32_t));
+        nextNode->init(root->header.type, keylen, root->vallen);
+
+        // the max key of current root is the max key of the next node after
+        // splitting.
+        newRoot->set(1, root->maxKey(), &nextNode->header.index);
+
+        // split
+        root->split(nextNode);
+
+        // chain
+        root->header.next = nextNode->header.index;
+        nextNode->header.last = root->header.index;
+
+        newRoot->set(0, root->maxKey(), &root->header.index);
+        newRoot->count = 2;
+
+        storage.setIndexOfRoot(newRoot->header.index);
+        root = newRoot;
+    }
+    return 1;
+}
+
+int BTree::get(const void* key, void* value) {
+    NodeBlock* leaf = getLeaf(key);
+    if (leaf == NULL)
+        return 0;
+
+    int index = leaf->find(key);
+    if (index == -1 || leaf->removed(index)) {
+        return 0;
+    }
+
+    if (value != NULL)
+        memcpy(value, leaf->getValue(index), vallen);
+    return 1;
+}
+
+// remove by flag
+int BTree::remove(const void* key) {
+    NodeBlock* leaf = getLeaf(key);
+    if (leaf == NULL)
+        return 0;
+
+    int index = leaf->find(key);
+    if (index == -1 || leaf->removed(index))
+        return 0;
+    // remove by flag
+    leaf->removeByFlag(index);
+    return 1;
+}
+
+BTree::Iterator* BTree::iterator() {
+    return new BTree::Iterator(*this);
+}
+
+/*-- File: btree.cpp end --*/
+/*-- #include "btree.h" start --*/
+/*-- File: buffer.cpp start --*/
+////
+// @file buffer.cpp
+// @brief
+// buffer manager
+//
+// @author yangtao
+// @email yangtaojay@gmail.com
+//
+/*-- #include "buffer.h" start --*/
+/*-- #include "block.h" start --*/
+#include <stdlib.h>
+
+void *BufferManager::allocateBlock() {
+    void *p = _aligned_malloc(BLOCK_SIZE, BLOCK_SIZE);
+    return p;
+}
+
+void BufferManager::freeBlock(void *_block) {
+    _aligned_free(_block);
+}
+/*-- File: buffer.cpp end --*/
+/*-- #include "buffer.h" start --*/
+/*-- #include "matu.h" start --*/
+/*-- File: storage.cpp start --*/
+#define _CRT_SECURE_NO_WARNINGS
+////
+// @file storage.cpp
+// @brief
+// storage manager
+//
+// @author yangtao
+// @email yangtaojay@gmail.com
+//
+/*-- #include "storage.h" start --*/
+#include <assert.h>
+#include <stdlib.h>
+
+static const uint32_t NUM_BLOCK = 16;
+
+StorageManager::StorageManager() : meta(NULL), file(NULL) {}
+
+StorageManager::StorageManager(const char * path) : meta(NULL), file(NULL) {
+    open(path);
+}
+
+int StorageManager::create(const char * path) {
+    //close();
+    FILE *file = fopen(path, "wb");
+    if (file == NULL) return false;
+
+    MetaBlock *block = (MetaBlock*)bufferManager.allocateBlock();
+    block->header.index = 0;
+    block->header.type = BLOCK_TYPE_META;
+    block->header.magic = MAGIC_NUM;
+    block->header.next = 0;
+    block->header.last = 0;
+
+    block->count = 1;
+    block->free = 0;
+    block->root = 0;
+
+    if (fwrite(block, BLOCK_SIZE, 1, file) != 1) {
+        bufferManager.freeBlock(block);
+        return false;
+    }
+
+    fclose(file);
+
+    buffers[0] = (RecordBlock*)block;
+    return true;
+}
+
+int StorageManager::open(const char * path) {
+    //close();
+    file = fopen(path, "r+b");
+    if (file == NULL) return false;
+
+    // read meta
+    meta = (MetaBlock*)getBlock(0);
+    if (meta == NULL) return false;
+    return true;
+}
+
+
+int StorageManager::close() {
+    if (file != NULL) {
+        save();
+        //fflush(file);
+        fclose(file);
+        file = NULL;
+        for (auto& x : buffers) {
+            x.second->header.index = -1;
+        }
+    }
+    return true;
+}
+
+bool StorageManager::save() {
+    for (auto& x : buffers) {
+        if (x.second->header.reserved == 1
+            && x.first == x.second->header.index) {
+            /*if (!file.writeBlock(x.second->header.index, x.second))
+                return false;*/
+            if (fseek(file, x.first*BLOCK_SIZE, SEEK_SET) != 0) return false;
+            x.second->header.reserved = 0;
+            if (fwrite(x.second, BLOCK_SIZE, 1, file) != 1) {
+                x.second->header.reserved = 1;
+                return false;
+            }
+            fflush(file);
+        }
+    }
+    return true;
+}
+
+
+
+StorageManager::~StorageManager() {
+    close();
+    //? TODO:
+    for (auto& x : buffers) {
+        bufferManager.freeBlock(x.second);
+    }
+}
+
+void* StorageManager::getBlock(uint32_t index) {
+    if (index != 0 && index >= meta->count) return NULL;
+    RecordBlock* block = buffers[index];
+    if (block == NULL) {
+        block = (RecordBlock*)bufferManager.allocateBlock();
+        /*if (!file.readBlock(index, block))
+            return NULL;*/
+        if (fseek(file, index * BLOCK_SIZE, SEEK_SET) != 0) return NULL;
+        size_t res = fread(block, BLOCK_SIZE, 1, file);
+        if (res != 1) {
+            bufferManager.freeBlock(block);
+            return NULL;
+        }
+        buffers[index] = block;
+    }
+    if (block->header.index != index) {
+        if (fseek(file, index * BLOCK_SIZE, SEEK_SET) != 0) return NULL;
+        size_t res = fread(block, BLOCK_SIZE, 1, file);
+        if (res != 1) {
+            bufferManager.freeBlock(block);
+            return NULL;
+        }
+    }
+    if (block != NULL)
+        block->header.reserved = 1;
+    return block;
+}
+
+//const void* StorageManager::readBlock(uint32_t index) {
+//    RecordBlock* block = buffers[index];
+//    if (block == NULL || block->header.index != index) {
+//        block = (RecordBlock*)bufferManager.allocateBlock();
+//        /*if (!file.readBlock(index, block))
+//            return NULL;*/
+//        buffers[index] = block;
+//    }
+//    if (block != NULL)
+//        block->header.reserved = 1;
+//    return block;
+//}
+
+
+void* StorageManager::getFreeBlock() {
+    if (meta->free != 0) {
+        RecordBlock* block = (RecordBlock*)getBlock(meta->free);
+        if (block == NULL) return NULL;
+
+        meta->free = block->header.next;
+        block->header.next = 0;
+        block->header.type = BLOCK_TYPE_FREE;
+        return block;
+    }
+
+    RecordBlock* block = (RecordBlock*)bufferManager.allocateBlock();
+    if (block == NULL) return NULL;
+    block->header.index = meta->count++;
+    block->header.magic = MAGIC_NUM;
+    block->header.next = 0;
+    block->header.last = 0;
+
+    if (fseek(file, (meta->count - 1)*BLOCK_SIZE, SEEK_SET) != 0 ||
+        fwrite(block, BLOCK_SIZE, 1, file) != 1) {
+        bufferManager.freeBlock(block);
+        return NULL;
+    }
+    buffers[block->header.index] = block;
+    block->header.reserved = 1;
+
+    return block;
+}
+
+int StorageManager::freeBlock(uint32_t index) {
+    RecordBlock* b = (RecordBlock*)getBlock(index);
+    if (b == NULL) return false;
+    b->header.next = meta->free;
+    meta->free = index;
+    return true;
+}
+
+
+uint32_t StorageManager::getIndexOfRoot() {
+    return meta->root;
+}
+
+void StorageManager::setIndexOfRoot(uint32_t i) {
+    //assert(i > 0 && i < meta->count);
+    meta->root = i;
+}
+
+void RecordManager::nextRoot() {
+    RecordBlock* newRoot = (RecordBlock*)s.getFreeBlock();
+    newRoot->init();
+    newRoot->header.next = root->header.index;
+    root->header.last = newRoot->header.index;
+    s.setIndexOfRoot(newRoot->header.index);
+    root = newRoot;
+}
+
+RecordManager::RecordManager(StorageManager & s) :s(s) {
+    if (s.getIndexOfRoot() == 0) {
+        // uint32_t index = 0;
+        root = (RecordBlock*)s.getFreeBlock();
+        if (root == NULL) {
+            // TODO: error
+        }
+        s.setIndexOfRoot(root->header.index);
+        root->init();
+    }
+    else {
+        root = (RecordBlock*)s.getBlock(s.getIndexOfRoot());
+        if (root == NULL) {
+            // TODO: error
+        }
+    }
+}
+
+int RecordManager::put(const Record * rcd, Location * loc) {
+    loc->index = root->header.index;
+    if (!root->addRecord(rcd, &loc->position)) {
+        nextRoot();
+        int res = root->addRecord(rcd, &loc->position);
+        loc->index = root->header.index;
+        assert(res == 1);
+        return res;
+    }
+    return 1;
+}
+
+int RecordManager::set(const Record * newRcd, Location * loc) {
+    RecordBlock *block = (RecordBlock*)s.getBlock(loc->index);
+    if (!block->updateRecord(loc->position, newRcd)) {
+        block->delRecord(loc->position);
+        if (put(newRcd, loc))
+            return 2;
+
+        return 0;
+    }
+    return 1;
+}
+
+int RecordManager::del(const Location * loc) {
+    RecordBlock *block = (RecordBlock*)s.getBlock(loc->index);
+    block->delRecord(loc->position);
+    return 1;
+}
+
+const Record* RecordManager::get(const Location * loc) {
+    RecordBlock *block = (RecordBlock*)s.getBlock(loc->index);
+    return block->getRecord(loc->position);
+}
+
+/*-- File: storage.cpp end --*/
+/*-- #include "storage.h" start --*/

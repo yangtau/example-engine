@@ -25,7 +25,7 @@ int NodeBlock::find(const void* key) const {
     while (lo < hi) {
         int mid = (lo + hi) / 2;
         void* p = (uint8_t*)kv + mid * sizeofkv();
-        int res = cmp(p, key);
+        int res = cmp(p, key, cmpp);
         if (res == 0)
             return mid;
         else if (res > 0)
@@ -42,7 +42,7 @@ int NodeBlock::lub(const void* key) const {
     while (lo < hi) {
         int mid = (lo + hi) / 2;
         void* p = (uint8_t*)kv + mid * sizeofkv();
-        int res = cmp(p, key);
+        int res = cmp(p, key, cmpp);
         if (res < 0)
             lo = mid + 1;  // key in kv[mid] is less than `key`
         else
@@ -152,7 +152,7 @@ int BTree::Iterator::open(const void* l, const void* h) {
     if (opened)
         return 0;  // the iterator has been opened
 
-    if (l != NULL && h != NULL && btree.cmp(l, h) >= 0)
+    if (l != NULL && h != NULL && btree.cmp(l, h, btree.cmpp) >= 0)
         return 0;
     // cpy lo, hi
     if (l != NULL) {
@@ -235,7 +235,7 @@ int BTree::Iterator::next() {
     // check the upper bound
     if (hi != NULL) {
         // uint8_t* p = cur->kv + index * cur->sizeofkv();
-        if (btree.cmp(cur->getKey(index), hi) >= 0) {  // p>=hi
+        if (btree.cmp(cur->getKey(index), hi, btree.cmpp) >= 0) {  // p>=hi
             hasNext = false;
             return 0;
         }
@@ -267,9 +267,9 @@ void BTree::Iterator::remove() {
 
 BTree::BTree(uint8_t keylen,
     uint8_t vallen,
-    Compare cmp,
-    StorageManager& storage)
-    : keylen(keylen), vallen(vallen), cmp(cmp), storage(storage) {
+    StorageManager& storage, Compare *c, void *p)
+    : keylen(keylen), vallen(vallen), storage(storage)
+    , cmp(c), cmpp(p) {
     if (storage.getIndexOfRoot() == 0) {
         // uint32_t index = 0;
         root = (NodeBlock*)getFreeBlock();
@@ -322,14 +322,14 @@ NodeBlock* BTree::getFirstLeaf() {
 NodeBlock* BTree::getBlock(uint32_t index) {
     NodeBlock* node = (NodeBlock*)storage.getBlock(index);
     assert(node != NULL);
-    node->setCmp(cmp);
+    node->setCmp(cmp, cmpp);
     return node;
 }
 
 NodeBlock* BTree::getFreeBlock() {
     NodeBlock* node = (NodeBlock*)storage.getFreeBlock();
     assert(node != NULL);
-    node->setCmp(cmp);
+    node->setCmp(cmp, cmpp);
     return node;
 }
 
@@ -337,7 +337,7 @@ int BTree::insert(const void* key, const void* value, NodeBlock* cur) {
     int index = cur->lub(key);
     if (cur->leaf()) {
         // repetition key
-        if (index < cur->count && cmp(key, cur->getKey(index)) == 0
+        if (index < cur->count && cmp(key, cur->getKey(index), cmpp) == 0
             //&& !cur->removed(index)
             )
             cur->set(index, NULL, value);

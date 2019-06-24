@@ -61,7 +61,7 @@ int StorageManager::open(const char * path) {
 int StorageManager::close() {
     if (file != NULL) {
         save();
-        fflush(file);
+        //fflush(file);
         fclose(file);
         file = NULL;
         for (auto& x : buffers) {
@@ -83,6 +83,7 @@ bool StorageManager::save() {
                 x.second->header.reserved = 1;
                 return false;
             }
+            //fflush(file);
         }
     }
     return true;
@@ -93,9 +94,9 @@ bool StorageManager::save() {
 StorageManager::~StorageManager() {
     close();
     //? TODO:
- /*   for (auto& x : buffers) {
+    for (auto& x : buffers) {
         bufferManager.freeBlock(x.second);
-    }*/
+    }
 }
 
 void* StorageManager::getBlock(uint32_t index) {

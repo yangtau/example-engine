@@ -1,3 +1,4 @@
+#pragma once
 #include <assert.h>
 #include <algorithm>
 #include <iostream>
@@ -376,8 +377,9 @@ static Condition conditionParse(const string& sql, int start = 0) {
     return res;
 }
 
-uint8_t keylen = sizeof(int), vallen = sizeof(RecordManager::Location);
-int cmp(const void* a, const void* b) {
+
+
+int cmp(const void* a, const void* b, void *) {
     return *(int*)a - *(int*)b;
 }
 StorageManager* s = NULL;
@@ -386,6 +388,7 @@ BTree* bTree = NULL;
 RecordManager* rm = NULL;
 bool initialized = false;
 void init() {
+    uint8_t keylen = sizeof(int), vallen = sizeof(RecordManager::Location);
     if (initialized)
         return;
     if (s == NULL) {
@@ -398,7 +401,11 @@ void init() {
     }
 
     if (bTree == NULL)
-        bTree = new BTree(keylen, vallen, cmp, *st);
+    {
+        bTree = new BTree(keylen, vallen, *st, cmp);
+        //bTree->setCmp(cmp, NULL);
+    }
+
     if (rm == NULL)
         rm = new RecordManager(*s);
     initialized = true;
@@ -423,6 +430,7 @@ void release() {
 }
 
 void initial() {
+    uint8_t keylen = sizeof(int), vallen = sizeof(RecordManager::Location);
     s = new StorageManager();
     s->create("table.db");
     s->open("table.db");
@@ -430,8 +438,11 @@ void initial() {
     st->create("index.db");
     st->open("index.db");
 
-    if (bTree == NULL)
-        bTree = new BTree(keylen, vallen, cmp, *st);
+    if (bTree == NULL) {
+        bTree = new BTree(keylen, vallen, *st, cmp);
+        //bTree->setCmp(cmp, NULL);
+    }
+
     if (rm == NULL)
         rm = new RecordManager(*s);
 

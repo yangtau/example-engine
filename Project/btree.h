@@ -15,8 +15,7 @@
 #include "block.h"
 #include "storage.h"
 
-
-typedef int(*Compare)(const void *, const void *);
+typedef int(Compare)(const void *, const void*, void*);
 
 #pragma pack(1)
 
@@ -28,7 +27,8 @@ struct NodeBlock {
     uint16_t count;
     uint8_t keylen;
     uint8_t vallen;
-    Compare cmp;
+    Compare *cmp;
+    void *cmpp;
     uint8_t kv[0]; // key[1]value
 
     void init(uint16_t type, uint8_t keylen, uint8_t vallen) {
@@ -38,7 +38,7 @@ struct NodeBlock {
         this->vallen = vallen;
     }
 
-    void setCmp(Compare c) { cmp = c; }
+    void setCmp(Compare *c, void *p) { cmp = c; cmpp = p; }
 
     uint16_t sizeofkv() const {
         return keylen + vallen + 1; // 1bytes for flag
@@ -147,7 +147,8 @@ private:
     const uint8_t keylen;
     const uint8_t vallen;
 
-    const Compare cmp;
+    Compare *cmp;
+    void *cmpp;
 
     NodeBlock* getLeaf(const void *key);
 
@@ -160,9 +161,10 @@ private:
     int insert(const void* key, const void* value, NodeBlock* cur);
 
 public:
-    BTree(uint8_t keylen, uint8_t vallen, Compare cmp, StorageManager &storage);
+    BTree(uint8_t keylen, uint8_t vallen, StorageManager &storage, Compare *c, void *p=NULL);
 
     ~BTree() {}
+
 
     int put(const void* key, const void* value);
 
