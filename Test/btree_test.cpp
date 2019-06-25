@@ -7,7 +7,10 @@
 
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
-int cmp(const void*a, const void *b) {
+int cmp(const void*a, const void *b, void*p) {
+    return *(uint8_t*)a - *(uint8_t*)b;
+}
+int _cmp(const void*a, const void *b) {
     return *(uint8_t*)a - *(uint8_t*)b;
 }
 namespace UnitTest {
@@ -20,7 +23,7 @@ public:
     TEST_METHOD(NodeBlockTest) {
         NodeBlock* node = (NodeBlock*)malloc(BLOCK_SIZE);
         node->init(BLOCK_TYPE_DATA, keylen, vallen);
-        node->setCmp(cmp);
+        node->setCmp(cmp, NULL);
 
         // empty
         Assert::AreEqual(true, node->empty());
@@ -42,7 +45,7 @@ public:
         uint8_t maxK = *(uint8_t*)node->maxKey();
         Assert::AreEqual((uint8_t)100, maxK);
 
-        qsort(keys, 30, sizeof(uint8_t), cmp);
+        qsort(keys, 30, sizeof(uint8_t), _cmp);
 
         // find & getKey
         Assert::AreEqual(0, node->find(keys + 0));
@@ -70,7 +73,7 @@ public:
         uint16_t cnt = node->count;
         NodeBlock* next = (NodeBlock*)malloc(BLOCK_SIZE);
         next->init(BLOCK_TYPE_DATA, keylen, vallen);
-        next->setCmp(cmp);
+        next->setCmp(cmp, NULL);
         node->split(next);
 
         Assert::AreEqual(((cnt + 1) / 2), (int)node->count);
@@ -94,14 +97,14 @@ public:
             31,39,17,68,71,99,35,38,85,6,
             56,50,73,9,10,20,46 };
         {
-            BTree b(keylen, vallen, cmp, s);
+            BTree b(keylen, vallen, s, cmp);
             for (int i = 0; i < len; i++) {
                 Assert::AreEqual(1, b.put(keys + i, values + i));
             }
         }
         {
             // get
-            BTree b(keylen, vallen, cmp, s);
+            BTree b(keylen, vallen, s, cmp);
             uint8_t v;
             uint8_t key = 200;
             Assert::AreEqual(0, b.get(&key, &v));
@@ -125,7 +128,7 @@ public:
         }
         {
             // remove
-            BTree b(keylen, vallen, cmp, s);
+            BTree b(keylen, vallen, s, cmp);
             for (int i = 0; i < len; i++) {
                 Assert::AreEqual(1, b.remove(keys + i));
             }
@@ -171,7 +174,7 @@ public:
             32,22,76,79,65,90,5,11,21,29,
             31,39,17,68,71,99,35,38,85,6,
             56,50,73,9,10,20,46 };
-        BTree b(keylen, vallen, cmp, s);
+        BTree b(keylen, vallen, s, cmp);
 
         BTree::Iterator *it = b.iterator();
 
@@ -321,6 +324,7 @@ public:
 
             //check remove
             Assert::AreEqual(0, it->open(&lo, &hi));
+            
 
             hi = k[13];
             Assert::AreEqual(1, it->open(&lo, &hi));

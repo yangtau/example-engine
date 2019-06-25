@@ -48,7 +48,7 @@ struct BlockHeader {
 
 struct Record {
     uint16_t size; // size of the record
-    uint8_t data[1];
+    uint8_t data[0];
 };
 
 
