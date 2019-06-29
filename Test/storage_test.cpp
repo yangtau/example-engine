@@ -10,7 +10,7 @@ namespace UnitTest {
     TEST_CLASS(StorageUnitTest) {
 public:
     TEST_METHOD(getFreeBlock) {
-        StorageManager s;
+        BufferManager s;
         s.create("storage-freeblock.db");
         s.open("storage-freeblock.db");
         RecordBlock *block = (RecordBlock*)s.getFreeBlock();
@@ -33,7 +33,7 @@ public:
     }
 
     TEST_METHOD(getBlock) {
-        StorageManager s;
+        BufferManager s;
         s.create("storage-test.db");
         s.open("storage-test.db");
         Assert::IsNotNull(s.getBlock(0));
@@ -41,7 +41,7 @@ public:
     }
 
     TEST_METHOD(resize) {
-        StorageManager s;
+        BufferManager s;
         s.create("storage-test.db");
         s.open("storage-test.db");
         for (int i = 0; i < 2 * 64; i++)
@@ -49,18 +49,18 @@ public:
     }
 
     TEST_METHOD(save) {
-        StorageManager s;
+        BufferManager s;
         s.create("storage-test.db");
         s.open("storage-test.db");
-        //uint32_t index = 0;
+        //u32 index = 0;
         RecordBlock *block = (RecordBlock *)s.getFreeBlock();
         Assert::IsNotNull(block);
 
-        uint32_t index = block->header.index;
+        u32 index = block->header.index;
 
         char data[10] = { 8, 0, 'H', 'e', 'l', 'l', 'o', '\0' };
 
-        uint16_t position;
+        u16 position;
         block->init();
         Assert::AreEqual(1, block->addRecord((Record*)data, &position));
 
@@ -75,11 +75,11 @@ public:
     }
 
     TEST_METHOD(indexOfRoot) {
-        StorageManager s;
+        BufferManager s;
         s.create("storage-test.db");
         s.open("storage-test.db");
 
-        uint32_t index = 20;
+        u32 index = 20;
 
         s.setIndexOfRoot(index);
 

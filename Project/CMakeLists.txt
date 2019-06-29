@@ -6,14 +6,13 @@ set(CMAKE_CXX_STANDARD 14)
 include_directories(.)
 
 add_executable(Project
+        common.h
         block.cpp
         block.h
         btree.cpp
         btree.h
-        storage.cpp
-        storage.h
+        buffer.cpp
+        buffer.h
         file.cpp
-        file.h
-        buffer.cpp buffer.h
         matu.h
         main.cpp)

@@ -7,6 +7,8 @@
 // @email yangtaojay@gmail.com
 
 #pragma once
+
+#include "common.h"
 #include <inttypes.h>
 // Block type
 #define BLOCK_TYPE_FREE 0  // free block
@@ -18,74 +20,61 @@
 
 #define MAGIC_NUM 0x1ef0c6c1
 
-const uint32_t BLOCK_SIZE = 4096;
+const u32 BLOCK_SIZE = 4096;
 
 #pragma pack(1)
-//
-//struct RecordHeader {
-//    uint16_t size;       // bytes of data
-//    uint16_t timestamp;  // TODO: size of timestamp
-//};
-
 
 ///
 // @brief
 // header of block
 // 12
 struct BlockHeader {
-    uint32_t magic;
-    uint16_t type : 3;  // type of block
-    uint16_t reserved : 13;
-    uint16_t checksum;
-    uint32_t index;  // index of this block
-    uint32_t next; // index of next block
-    uint32_t last;
+    u32 magic;
+    u16 type : 3;  // type of block
+    u16 reserved : 13;
+    u16 checksum;
+    u32 index;  // index of this block
+    u32 next;   // index of next block
+    u32 last;
 
-    uint16_t compute();  // compute checksum and set it
-    int check();         // check checksum
+    u16 compute();  // compute checksum and set it
+    int check();    // check checksum
+    void init(u32 index) {
+        this->index = index;
+        magic = MAGIC_NUM;
+        //reserved = 0;
+        next = 0;
+        last = 0;
+    }
 };
-
-
-struct Record {
-    uint16_t size; // size of the record
-    uint8_t data[0];
-};
-
-
+//
+//struct Record {
+//    u16 size;  // size of the record
+//    u8 data[0];
+//};
 
 ///
 // @brief
 // record block
 // 12 + 8
-struct RecordBlock {
+struct DataBlock {
     BlockHeader header;
-    uint16_t count; // the number of records in this block
-    uint16_t free; // 
+    u16 count;  // the number of records in this block
+    u16 free;   //
 
-    uint16_t directory[0];
- 
-    void init();
+    u16 directory[0];
+
+    void init(u32 index);
 
     int freeSize();
 
-    int addRecord(const Record* record, uint16_t* position);
+    int insert(const void *data, u16 size, u16 *position);
 
-    int delRecord(uint16_t position);
+//    int del(u16 position);
 
-    Record* getRecord(uint16_t position);
+    const void *get(u16 position);
 
-    int updateRecord(uint16_t position, const Record* record);
-
+//    int update(u16 position, const Record *record);
 };
+
 #pragma pack()
-
-
-///
-// @brief
-// metadata blcok
-struct MetaBlock {
-    BlockHeader header;
-    uint32_t free;      // the index of first free block
-    uint32_t root;      // root of b+tree
-    uint32_t count;     // num of blocks
-};

@@ -17,7 +17,7 @@ public:
             buffer[i] = (short)rand();
         }
         RecordBlock *block = (RecordBlock*)buffer;
-        uint16_t checksum = block->header.compute();
+        u16 checksum = block->header.compute();
         block->header.checksum = checksum;
         Assert::AreEqual(1, block->header.check());
         free(buffer);
@@ -33,7 +33,7 @@ public:
             // add multi records
             int len = 300;
             for (int i = 0; i < len; i++) {
-                uint16_t pos;
+                u16 pos;
                 Assert::AreEqual(1, block->addRecord((Record*)data, &pos));
                 Assert::AreEqual(i, (int)pos);
             }

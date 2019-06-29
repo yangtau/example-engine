@@ -4,52 +4,50 @@
 // B+tree
 //
 // @author yangtao
-// @email yangtaojay@gamil.com
+// @email yangtaojay@gmail.com
 //
 
 #pragma once
 
-#include <inttypes.h>
-//#include <vector>
 #include <assert.h>
+#include <inttypes.h>
 #include "block.h"
-#include "storage.h"
+#include "buffer.h"
 
 typedef int(Compare)(const void *, const void *, void *);
 
+class BTree;
+
 #pragma pack(1)
 
-///
-// @breif
-// node of b+tree
+/*
+ * @brief
+ * node of b+tree
+ */
 struct NodeBlock {
   BlockHeader header;
-  uint16_t count;
-  uint8_t keylen;
-  uint8_t vallen;
-  Compare *cmp;
-  void *cmpp;
-  uint8_t kv[0];  // key[1]value
+  u16 count;
+  u8 keySize;
+  u8 valSize;
+  BTree *btree;
+  u8 kv[0];  // key[1]value
 
-  void init(uint16_t type, uint8_t keylen, uint8_t vallen) {
+  void init(u32 index, u16 type, u8 keySize, u8 valSize, BTree *b = NULL) {
+    header.init(index);
     count = 0;
-    header.next = 0;
-    header.last = 0;
     header.type = type;
-    this->keylen = keylen;
-    this->vallen = vallen;
+    this->keySize = keySize;
+    this->valSize = valSize;
+    btree = b;
   }
 
-  void setCmp(Compare *c, void *p) {
-    cmp = c;
-    cmpp = p;
+  void setBTree(BTree *t) { btree = t; }
+
+  u16 sizeOfItem() const {
+    return keySize + valSize + 1;  // 1bytes for flag
   }
 
-  uint16_t sizeofkv() const {
-    return keylen + vallen + 1;  // 1bytes for flag
-  }
-
-  uint16_t size() const;
+  u16 size() const;
 
   bool full() const {
     assert(count <= size());
@@ -75,7 +73,7 @@ struct NodeBlock {
   const void *getKey(int index) const;
 
   // insert kv in index, the items after index will be move backward
-  void insert(const void *key, const void *value, uint16_t index);
+  void insert(const void *key, const void *value, u16 index);
 
   void insert(const void *key, const void *value) {
     insert(key, value, lub(key));
@@ -83,105 +81,148 @@ struct NodeBlock {
 
   // if key or value is null, it will remain the origin key or value;
   // default flag is `1`
-  void set(uint16_t index, const void *key, const void *value,
-           uint8_t flag = 1);
+  void set(u16 index, const void *key, const void *value, u8 flag = 1);
 
   void split(NodeBlock *nextNode);
 
   // merge `nextNode` with this block
   void merge(NodeBlock *nextNode);
 
-  void remove(uint16_t index);
+  void remove(u16 index);
 
-  bool removed(uint16_t index) const;
+  bool removed(u16 index) const;
 
-  void removeByFlag(uint16_t index);
+  void removeByFlag(u16 index);
 
-  // TODO: compare with key
+  int compare(u16 index, const void *key) const;
+};
+
+struct BTreeMetadata {
+  BlockHeader header;
+  u32 root;  // index of root
+  u32 countOfItem;
+  u32 countOfBlock;   // the number of used blocks
+  u32 numberOfBlock;  // the number of all blocks
+
+  void init(u32 index) {
+    header.init(index);
+    header.type = BLOCK_TYPE_META;
+    root = 0;
+    countOfItem = 0;
+    countOfBlock = 0;
+    numberOfBlock = 0;
+  }
 };
 
 #pragma pack()
 
 class BTree {
-  friend class BTreeIterator;
+  friend struct NodeBlock;
 
  public:
+  // location of value in data block
+#pragma pack(1)
+  struct Location {
+    u32 index;     // index of block
+    u16 position;  // position in block
+  };
+#pragma pack(0)
+
   class Iterator {
     NodeBlock *cur = NULL;
     int index = -1;
-    BTree &btree;
-    void *lo = NULL;
-    void *hi = NULL;
-    // bool status = false;
-    bool opened = false;
+    BTree *btree;
 
    public:
-    Iterator(BTree &bt) : btree(bt) {}
+    Iterator(BTree *b) : btree(b) {}
 
-    ~Iterator() { close(); }
+    ~Iterator() {}
 
-    // [lo, hi)
-    // after iter opened, it will pointe at `lo` or item bigger than `lo`
-    // lo and hi can be null
-    // if inverse is 0, place the first postion at hi
-    int open(const void *lo, const void *hi, int inverse = 0);
+    // @param flag   0 exact the key
+    //               1 the key or next
+    //               2 the key or prev
+    //               3 after the key
+    //               4 before the key
+    int locate(const void *key, int flag);
 
-    void close();
+    int first();
 
-    // return 0 if it ends
+    int last();
+
+    // return 0 if failed to move to the next key
     int next();
 
+    // return 0 if failed to move to the previous key
     int prev();
 
-    void set(void *value);
+    const void *getKey();
 
-    void get(void *key, void *value) const;
+    const void *getValue();
 
-    const void *getKey() const;
+    // compare current key with `key`
+    int compare(const void *key) const;
 
     // remove by flag
     void remove();
   };
 
  private:
-  StorageManager &storage;
   NodeBlock *root = NULL;
-  const uint8_t keylen;
-  const uint8_t vallen;
+  BTreeMetadata *meta = NULL;
+
+  const u8 keySize;
+  typedef u32 NodeValue;
+  const u8 nodeValueSize = sizeof(NodeValue);
+  typedef Location LeafValue;
+  const u8 leafValueSize = sizeof(LeafValue);
 
   Compare *cmp;
-  void *cmpp;
+  void *extraCmpInfo;  // extra information used in comparison
+
+  // buffer & file
+  BufferManager *buffer = NULL;
+  MyFile file;
+  const u32 blockSize = 4096;
 
   NodeBlock *getLeaf(const void *key);
 
   NodeBlock *getFirstLeaf();
 
-  NodeBlock *getBlock(uint32_t index);
+  NodeBlock *getLastLeaf();
 
-  NodeBlock *getFreeBlock();
+  NodeBlock *getNodeBlock(u32 index);
 
-  int insert(const void *key, const void *value, NodeBlock *cur);
+  NodeBlock *getFreeNodeBlock(u16 type, u8 keySize, u8 valueSize);
+
+  DataBlock *getFreeDataBlock();
+
+  int insert(const void *key, const void *value, u32 valueSize, NodeBlock *cur);
+
+  int insertValue(u32 index, const void *value, u32 valueSize, Location *loc);
+
+  const void *getValue(Location loc);
 
  public:
-  BTree(uint8_t keylen, uint8_t vallen, StorageManager &storage, Compare *c,
-        void *p = NULL);
+  BTree(u8 keySize, Compare *c, void *extraCmpInfo = NULL);
 
-  ~BTree() {}
+  int create(const char *filename);
 
-  uint32_t size() {
-    if (root->leaf()) return root->count;
-    return root->count * root->size();
+  int open(const char *filename);
+
+  ~BTree() {
+    if (!buffer->save()) {
+      fprintf(stderr, "buffer save");
+    }
+    //delete buffer;
   }
 
-  int put(const void *key, const void *value);
+  u32 countOfItems() { return meta->countOfItem; }
 
-  int get(const void *key, void *value);
+  int put(const void *key, const void *value, u32 valueSize);
 
-  int remove(const void *key);
+  //    int get(const void *key, void *value);
 
-  // range query
-  // `lo` or `hi` can be NULL;
-  // if `lo` is NULL, it will start from the first items;
-  // if `hi` is NULL, it will end in the last item;
-  Iterator *iterator();
+  //    int del(const void *key);
+
+  Iterator iterator() { return Iterator(this); };
 };
