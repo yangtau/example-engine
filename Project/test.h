@@ -343,3 +343,36 @@ void testReinsert() {
     }
   }
 }
+
+void testConstValue() {
+  {
+    BTree btree(sizeof(int), cmp, NULL, sizeof(int));
+    assert_equal(1, btree.create("test.db"), "");
+    assert_equal(1, btree.open("test.db"), "");
+
+    for (int i = 0; i < 400; i += 2) {
+      int value = i * i + i;
+      assert_equal(1, btree.put(&i, &value), "");
+    }
+  }
+  {
+    BTree btree(sizeof(int), cmp, NULL, sizeof(int));
+    assert_equal(1, btree.open("test.db"), "");
+    BTree::Iterator it = btree.iterator();
+    int key = 0;
+    assert_equal(1, it.locate(&key, 0), "");
+    do {
+      assert_equal(key * key + key, *(int *)it.getValue(), "");
+      key += 2;
+    } while (it.next());
+    assert_equal(400, key, "");
+  }
+}
+
+void test() {
+  testPutAndQuery();
+  testIterator();
+  testRemove();
+  testReinsert();
+  testConstValue();
+}

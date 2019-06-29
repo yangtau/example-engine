@@ -174,9 +174,11 @@ class BTree {
   typedef u32 NodeValue;
   const u8 nodeValueSize = sizeof(NodeValue);
   typedef Location LeafValue;
-  const u8 leafValueSize = sizeof(LeafValue);
 
-  Compare *cmp;
+  const u8 leafValueSize;
+  const bool isConstValueSize;
+
+  const Compare *cmp;
   void *extraCmpInfo;  // extra information used in comparison
 
   // buffer & file
@@ -203,7 +205,7 @@ class BTree {
   const void *getValue(Location loc);
 
  public:
-  BTree(u8 keySize, Compare *c, void *extraCmpInfo = NULL);
+  BTree(u8 keySize, Compare *c, void *extraCmpInfo = NULL, u8 valueSize = -1);
 
   int create(const char *filename);
 
@@ -213,12 +215,13 @@ class BTree {
     if (!buffer->save()) {
       fprintf(stderr, "buffer save");
     }
-    //delete buffer;
+    // delete buffer;
   }
 
   u32 countOfItems() { return meta->countOfItem; }
 
-  int put(const void *key, const void *value, u32 valueSize);
+  // if the size of value is constant, `valueSize` should be -1
+  int put(const void *key, const void *value, u32 valueSize = -1);
 
   //    int get(const void *key, void *value);
 

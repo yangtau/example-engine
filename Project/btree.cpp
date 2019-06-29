@@ -269,14 +269,22 @@ int BTree::Iterator::compare(const void *key) const {
 const void *BTree::Iterator::getKey() { return cur->getKey(index); }
 
 const void *BTree::Iterator::getValue() {
-  Location loc = *(Location *)cur->getValue(index);
-  return btree->getValue(loc);
+  if (btree->isConstValueSize) {
+    return cur->getValue(index);
+  } else {
+    Location loc = *(Location *)cur->getValue(index);
+    return btree->getValue(loc);
+  }
 }
 
 // BTree
 
-BTree::BTree(u8 keySize, Compare *c, void *p)
-    : keySize(keySize), cmp(c), extraCmpInfo(p) {}
+BTree::BTree(u8 keySize, Compare *c, void *p, u8 valueSize)
+    : keySize(keySize),
+      cmp(c),
+      extraCmpInfo(p),
+      leafValueSize(valueSize == -1 ? sizeof(LeafValue) : valueSize),
+      isConstValueSize(valueSize != -1) {}
 
 int BTree::create(const char *filename) {
   u32 numOfBlock = 32;
@@ -433,7 +441,7 @@ const void *BTree::getValue(BTree::Location loc) {
   if (block == NULL) return NULL;
   const void *p = block->get(loc.position);
 
-  //    buffer->releaseBlock(loc.index);
+  // buffer->releaseBlock(loc.index);
   return p;
 }
 
@@ -446,25 +454,33 @@ int BTree::insert(const void *key, const void *value, u32 valueSize,
     // repetition key
     if (index < cur->count && cur->compare(index, key) == 0) {
       if (cur->removed(index)) {
-        Location loc = *(Location *)cur->getValue(index);
-        if (!insertValue(loc.index, value, valueSize, &loc)) {
-          return -1;
+        if (isConstValueSize) {
+          cur->set(index, NULL, value);
+        } else {
+          Location loc = *(Location *)cur->getValue(index);
+          if (!insertValue(loc.index, value, valueSize, &loc)) {
+            return -1;
+          }
+          cur->set(index, NULL, &loc);
         }
-        cur->set(index, NULL, &loc);
       } else {
         return 0;  // duplicate key
       }
     } else {
-      Location loc;
-      if (!cur->empty()) {
-        loc = *(Location *)cur->getValue(index - 1);
+      if (isConstValueSize) {
+        cur->insert(key, value, index);
       } else {
-        loc.index = meta->countOfBlock;  // insert into new block
+        Location loc;
+        if (!cur->empty()) {
+          loc = *(Location *)cur->getValue(index - 1);
+        } else {
+          loc.index = meta->countOfBlock;  // insert into new block
+        }
+        if (!insertValue(loc.index, value, valueSize, &loc)) {
+          return -1;
+        }
+        cur->insert(key, &loc, index);
       }
-      if (!insertValue(loc.index, value, valueSize, &loc)) {
-        return -1;
-      }
-      cur->insert(key, &loc, index);
     }
     return 1;
   }
@@ -499,7 +515,6 @@ int BTree::insert(const void *key, const void *value, u32 valueSize,
       NodeBlock *oldnext = getNodeBlock(son->header.next);
       oldnext->header.last = next->header.index;
       next->header.next = son->header.next;
-      //            buffer->releaseBlock(oldnext->header.index);
     }
 
     son->header.next = next->header.index;
@@ -548,28 +563,3 @@ int BTree::put(const void *key, const void *value, u32 valueSize) {
   }
   return 1;
 }
-
-// int BTree::get(const void *key, void *value) {
-//    NodeBlock *leaf = getLeaf(key);
-//    if (leaf == NULL) return 0;
-//
-//    int index = leaf->find(key);
-//    if (index == -1 || leaf->removed(index)) {
-//        return 0;
-//    }
-//
-//    if (value != NULL) memcpy(value, leaf->getValue(index), vallen);
-//    return 1;
-//}
-
-// remove by flag
-// int BTree::del(const void *key) {
-//    NodeBlock *leaf = getLeaf(key);
-//    if (leaf == NULL) return 0;
-//
-//    int index = leaf->find(key);
-//    if (index == -1 || leaf->removed(index)) return 0;
-//    // remove by flag
-//    leaf->removeByFlag(index);
-//    return 1;
-//}
