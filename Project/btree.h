@@ -183,13 +183,13 @@ private:
     const u16 keySize;
     typedef u32 NodeValue;
     const u16 nodeValueSize = sizeof(NodeValue);
-    
+
     typedef Location LeafValue; // for nonconst value
 
     const u16 leafValueSize;
     const bool isConstValueSize;
 
-    const Compare *cmp;
+    Compare *cmp;
     void *extraCmpInfo; // extra information used in comparison
 
     // buffer & file
@@ -221,6 +221,13 @@ public:
 
     int open(const char *filename);
 
+    int save() {
+        int res = buffer->save();
+        meta->header.reserved = 1;
+        root->header.reserved = 1;
+        return res;
+    }
+
     ~BTree() {
         if (buffer && !buffer->save()) {
             fprintf(stderr, "buffer save");
@@ -229,6 +236,8 @@ public:
     }
 
     u32 countOfItems() { return meta->countOfItem; }
+
+    void setCmp(Compare cmp) { this->cmp = cmp; }
 
     // if the size of value is constant, `valueSize` should be -1
     int put(const void *key, const void *value, u32 valueSize = -1);

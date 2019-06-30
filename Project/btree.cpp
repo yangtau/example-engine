@@ -136,7 +136,7 @@ void NodeBlock::removeByFlag(u16 index) { set(index, NULL, NULL, 0); }
 
 // compare the key with `index`, and `key`
 int NodeBlock::compare(u16 index, const void *key) const {
-    return btree->cmp(key, this->getKey(index), btree->extraCmpInfo);
+    return btree->cmp(this->getKey(index), key, btree->extraCmpInfo);
 }
 
 int BTree::Iterator::locate(const void *key, IterFlag flag) {
