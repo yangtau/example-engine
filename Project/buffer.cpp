@@ -22,7 +22,7 @@ BufferManager::~BufferManager() {
 }
 
 int BufferManager::save() {
-  for (auto &i : pool) {
+  for (auto i : pool) {
     // if the block is dirty, `reserved` = 1.
     if (i.second->reserved) {
       i.second->reserved = 0;

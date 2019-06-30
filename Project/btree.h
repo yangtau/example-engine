@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include <assert.h>
-#include <inttypes.h>
 #include "block.h"
 #include "buffer.h"
+#include <assert.h>
+#include <inttypes.h>
 
 typedef int(Compare)(const void *, const void *, void *);
 
@@ -25,207 +25,217 @@ class BTree;
  * node of b+tree
  */
 struct NodeBlock {
-  BlockHeader header;
-  u16 count;
-  u8 keySize;
-  u8 valSize;
-  BTree *btree;
-  u8 kv[0];  // key[1]value
+    BlockHeader header;
+    u16 count;
+    u16 keySize;
+    u16 valSize;
+    BTree *btree;
+    u8 kv[0]; // key[1]value
 
-  void init(u32 index, u16 type, u8 keySize, u8 valSize, BTree *b = NULL) {
-    header.init(index);
-    count = 0;
-    header.type = type;
-    this->keySize = keySize;
-    this->valSize = valSize;
-    btree = b;
-  }
+    void init(u32 index, u16 type, u16 keySize, u16 valSize, BTree *b = NULL) {
+        header.init(index);
+        count = 0;
+        header.type = type;
+        this->keySize = keySize;
+        this->valSize = valSize;
+        btree = b;
+    }
 
-  void setBTree(BTree *t) { btree = t; }
+    void setBTree(BTree *t) { btree = t; }
 
-  u16 sizeOfItem() const {
-    return keySize + valSize + 1;  // 1bytes for flag
-  }
+    u16 sizeOfItem() const {
+        return keySize + valSize + 1; // 1bytes for flag
+    }
 
-  u16 size() const;
+    u16 size() const;
 
-  bool full() const {
-    assert(count <= size());
-    return count == size();
-  };
+    bool full() const {
+        assert(count <= size());
+        return count == size();
+    };
 
-  bool empty() const { return count == 0; }
+    bool empty() const { return count == 0; }
 
-  bool leaf() const { return header.type == BLOCK_TYPE_LEAF; }
+    bool leaf() const { return header.type == BLOCK_TYPE_LEAF; }
 
-  // return -1 if no such key exists
-  int find(const void *key) const;
+    // return -1 if no such key exists
+    int find(const void *key) const;
 
-  // least upper bound
-  // return `count` if `key` is bigger than all items in the block
-  int lub(const void *key) const;
+    // least upper bound
+    // return `count` if `key` is bigger than all items in the block
+    int lub(const void *key) const;
 
-  const void *maxKey() const;
+    const void *maxKey() const;
 
-  // value in kv[index]
-  const void *getValue(int index) const;
+    // value in kv[index]
+    const void *getValue(int index) const;
 
-  const void *getKey(int index) const;
+    const void *getKey(int index) const;
 
-  // insert kv in index, the items after index will be move backward
-  void insert(const void *key, const void *value, u16 index);
+    // insert kv in index, the items after index will be move backward
+    void insert(const void *key, const void *value, u16 index);
 
-  void insert(const void *key, const void *value) {
-    insert(key, value, lub(key));
-  }
+    void insert(const void *key, const void *value) {
+        insert(key, value, lub(key));
+    }
 
-  // if key or value is null, it will remain the origin key or value;
-  // default flag is `1`
-  void set(u16 index, const void *key, const void *value, u8 flag = 1);
+    // if key or value is null, it will remain the origin key or value;
+    // default flag is `1`
+    void set(u16 index, const void *key, const void *value, u8 flag = 1);
 
-  void split(NodeBlock *nextNode);
+    void split(NodeBlock *nextNode);
 
-  // merge `nextNode` with this block
-  void merge(NodeBlock *nextNode);
+    // merge `nextNode` with this block
+    void merge(NodeBlock *nextNode);
 
-  void remove(u16 index);
+    void remove(u16 index);
 
-  bool removed(u16 index) const;
+    bool removed(u16 index) const;
 
-  void removeByFlag(u16 index);
+    void removeByFlag(u16 index);
 
-  int compare(u16 index, const void *key) const;
+    int compare(u16 index, const void *key) const;
 };
 
 struct BTreeMetadata {
-  BlockHeader header;
-  u32 root;  // index of root
-  u32 countOfItem;
-  u32 countOfBlock;   // the number of used blocks
-  u32 numberOfBlock;  // the number of all blocks
+    BlockHeader header;
+    u32 root; // index of root
+    u32 countOfItem;
+    u32 countOfBlock;  // the number of used blocks
+    u32 numberOfBlock; // the number of all blocks
 
-  void init(u32 index) {
-    header.init(index);
-    header.type = BLOCK_TYPE_META;
-    root = 0;
-    countOfItem = 0;
-    countOfBlock = 0;
-    numberOfBlock = 0;
-  }
+    void init(u32 index) {
+        header.init(index);
+        header.type = BLOCK_TYPE_META;
+        root = 0;
+        countOfItem = 0;
+        countOfBlock = 0;
+        numberOfBlock = 0;
+    }
 };
 
 #pragma pack()
 
 class BTree {
-  friend struct NodeBlock;
+    friend struct NodeBlock;
 
- public:
-  // location of value in data block
+public:
+    // location of value in data block
 #pragma pack(1)
-  struct Location {
-    u32 index;     // index of block
-    u16 position;  // position in block
-  };
+    struct Location {
+        u32 index;    // index of block
+        u16 position; // position in block
+    };
 #pragma pack(0)
 
-  class Iterator {
-    NodeBlock *cur = NULL;
-    int index = -1;
-    BTree *btree;
+    enum IterFlag {
+        EXACT_KEY = 0,
+        KEY_OR_NEXT = 1,
+        KEY_OR_PREV = 2,
+        AFTER_KEY = 3,
+        BEFROE_KEY = 4
+    };
 
-   public:
-    Iterator(BTree *b) : btree(b) {}
+    class Iterator {
+        NodeBlock *cur = NULL;
+        int index = -1;
+        BTree *btree = NULL;
 
-    ~Iterator() {}
+    public:
+        Iterator(BTree *b) : btree(b) {}
+        Iterator() {}
+        void setBTree(BTree *b) { btree = b; }
 
-    // @param flag   0 exact the key
-    //               1 the key or next
-    //               2 the key or prev
-    //               3 after the key
-    //               4 before the key
-    int locate(const void *key, int flag);
+        ~Iterator() {}
 
-    int first();
+        // @param flag   0 exact the key
+        //               1 the key or next
+        //               2 the key or prev
+        //               3 after the key
+        //               4 before the key
+        int locate(const void *key, IterFlag flag);
 
-    int last();
+        int first();
 
-    // return 0 if failed to move to the next key
-    int next();
+        int last();
 
-    // return 0 if failed to move to the previous key
-    int prev();
+        // return 0 if failed to move to the next key
+        int next();
 
-    const void *getKey();
+        // return 0 if failed to move to the previous key
+        int prev();
 
-    const void *getValue();
+        const void *getKey();
 
-    // compare current key with `key`
-    int compare(const void *key) const;
+        const void *getValue();
 
-    // remove by flag
-    void remove();
-  };
+        // compare current key with `key`
+        int compare(const void *key) const;
 
- private:
-  NodeBlock *root = NULL;
-  BTreeMetadata *meta = NULL;
+        // remove by flag
+        void remove();
+    };
 
-  const u8 keySize;
-  typedef u32 NodeValue;
-  const u8 nodeValueSize = sizeof(NodeValue);
-  typedef Location LeafValue;
+private:
+    NodeBlock *root = NULL;
+    BTreeMetadata *meta = NULL;
 
-  const u8 leafValueSize;
-  const bool isConstValueSize;
+    const u16 keySize;
+    typedef u32 NodeValue;
+    const u16 nodeValueSize = sizeof(NodeValue);
+    
+    typedef Location LeafValue; // for nonconst value
 
-  const Compare *cmp;
-  void *extraCmpInfo;  // extra information used in comparison
+    const u16 leafValueSize;
+    const bool isConstValueSize;
 
-  // buffer & file
-  BufferManager *buffer = NULL;
-  MyFile file;
-  const u32 blockSize = 4096;
+    const Compare *cmp;
+    void *extraCmpInfo; // extra information used in comparison
 
-  NodeBlock *getLeaf(const void *key);
+    // buffer & file
+    BufferManager *buffer = NULL;
+    MyFile file;
+    const static u32 blockSize = 4096;
 
-  NodeBlock *getFirstLeaf();
+    NodeBlock *getLeaf(const void *key);
 
-  NodeBlock *getLastLeaf();
+    NodeBlock *getFirstLeaf();
 
-  NodeBlock *getNodeBlock(u32 index);
+    NodeBlock *getLastLeaf();
 
-  NodeBlock *getFreeNodeBlock(u16 type, u8 keySize, u8 valueSize);
+    NodeBlock *getNodeBlock(u32 index);
 
-  DataBlock *getFreeDataBlock();
+    NodeBlock *getFreeNodeBlock(u16 type, u16 keySize, u16 valueSize);
 
-  int insert(const void *key, const void *value, u32 valueSize, NodeBlock *cur);
+    DataBlock *getFreeDataBlock();
 
-  int insertValue(u32 index, const void *value, u32 valueSize, Location *loc);
+    int insert(const void *key, const void *value, u32 valueSize, NodeBlock *cur);
 
-  const void *getValue(Location loc);
+    int insertValue(u32 index, const void *value, u32 valueSize, Location *loc);
 
- public:
-  BTree(u8 keySize, Compare *c, void *extraCmpInfo = NULL, u8 valueSize = -1);
+    const void *getValue(Location loc);
 
-  int create(const char *filename);
+public:
+    BTree(u16 keySize, Compare *c, void *extraCmpInfo = NULL, u16 valueSize = 0xffff);
+    int create(const char *filename);
 
-  int open(const char *filename);
+    int open(const char *filename);
 
-  ~BTree() {
-    if (!buffer->save()) {
-      fprintf(stderr, "buffer save");
+    ~BTree() {
+        if (buffer && !buffer->save()) {
+            fprintf(stderr, "buffer save");
+        }
+        // delete buffer;
     }
-    // delete buffer;
-  }
 
-  u32 countOfItems() { return meta->countOfItem; }
+    u32 countOfItems() { return meta->countOfItem; }
 
-  // if the size of value is constant, `valueSize` should be -1
-  int put(const void *key, const void *value, u32 valueSize = -1);
+    // if the size of value is constant, `valueSize` should be -1
+    int put(const void *key, const void *value, u32 valueSize = -1);
 
-  //    int get(const void *key, void *value);
+    //    int get(const void *key, void *value);
 
-  //    int del(const void *key);
+    //    int del(const void *key);
 
-  Iterator iterator() { return Iterator(this); };
+    Iterator iterator() { return Iterator(this); };
 };

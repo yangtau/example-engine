@@ -16,7 +16,7 @@ u16 BlockHeader::compute() {
     u32 sum = 0;
     // Size of block is even, so there is no need to handle odd-sized block
     for (int i = 0; i < BLOCK_SIZE / 2; i++) {
-        sum += ((u16 *) this)[i];  // get two bytes
+        sum += ((u16 *)this)[i];  // get two bytes
     }
     sum -= this->checksum;  // substract checksum from sum
     // Fold to get ones-complement result
@@ -29,7 +29,7 @@ u16 BlockHeader::compute() {
 int BlockHeader::check() {
     u32 sum = 0;
     for (int i = 0; i < BLOCK_SIZE / 2; i++) {
-        sum += ((u16 *) this)[i];  // get two bytes
+        sum += ((u16 *)this)[i];  // get two bytes
     }
     while (sum >> 16) {
         sum = (sum & 0xffff) + (sum >> 16);
@@ -46,7 +46,7 @@ void DataBlock::init(u32 index) {
 }
 
 int DataBlock::freeSize() {
-    return (int) free - ((u8 *) &directory[count + 1] - (u8 *) this);
+    return (int)free - ((u8 *)&directory[count + 1] - (u8 *)this) - sizeof(u16);
 }
 
 int DataBlock::insert(const void *data, u16 size, u16 *position) {
@@ -55,7 +55,7 @@ int DataBlock::insert(const void *data, u16 size, u16 *position) {
     }
     DataBlock::free -= size;
 
-    memcpy((u8 *) this + free, data, size);
+    memcpy((u8 *)this + free, data, size);
 
     if (position != NULL)
         *position = DataBlock::count;
@@ -75,7 +75,7 @@ const void *DataBlock::get(u16 position) {
     // if the record is removed, the offset is 0
     if (offset == 0) return NULL;
 
-    return ((u8 *) this + offset);
+    return ((u8 *)this + offset);
 }
 
 //

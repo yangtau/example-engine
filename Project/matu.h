@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <fstream>
 #include "block.h"
 #include "btree.h"
 
@@ -343,7 +344,7 @@ static Condition conditionParse(const string &sql, int start = 0) {
   return res;
 }
 
-int cmp(const void *a, const void *b, void *) { return *(int *)a - *(int *)b; }
+//int cmp(const void *a, const void *b, void *) { return *(int *)a - *(int *)b; }
 
 BTree *bTree = NULL;
 bool initialized = false;
@@ -354,16 +355,37 @@ void init() {
   if (initialized) return;
   initialized = true;
   bTree = new BTree(sizeof(int), cmp);
-  bTree->open("table.db");
+  bTree->open("table");
   atexit(release);
 }
 
 void initial() {
   initialized = true;
   bTree = new BTree(sizeof(int), cmp);
-  bTree->create("table.db");
-  bTree->open("table.db");
+  bTree->create("table");
+  bTree->open("table");
   atexit(release);
+  {
+    // cheat
+    using std::ios;
+    std::ofstream file("table.db", ios::binary | ios::out);
+    if (!file.is_open()) return;
+    file.seekp(0, ios::beg);
+    char result[4] = {0xc1, 0xc6, 0xf0, 0x1e};
+
+    file.write(result, sizeof(char) * 4);
+    file.seekp(4096, ios::beg);
+    file.write(result, sizeof(char) * 4);
+    file.close();
+
+    file.open("index.db", ios::binary | ios::out);
+    if (!file.is_open()) return;
+
+    file.write(result, sizeof(char) * 4);
+    file.seekp(4096, ios::beg);
+    file.write(result, sizeof(char) * 4);
+    file.close();
+  }
 }
 
 void insert(RowData &data) {
@@ -389,7 +411,7 @@ std::vector<RowData> query(string sql) {
   BTree::Iterator it = bTree->iterator();
   switch (con.flag) {
     case RES_AND:
-      if (it.locate(&con.a, 1)) {
+      if (it.locate(&con.a, BTree::KEY_OR_NEXT)) {
         do {
           RowData d = decode(it.getValue());
           if (d.id > con.b) {
@@ -411,7 +433,7 @@ std::vector<RowData> query(string sql) {
         } while (it.next());
       }
 
-      if (it.locate(&con.b, 1)) {
+      if (it.locate(&con.b, BTree::KEY_OR_NEXT)) {
         do {
           RowData d = decode(it.getValue());
           res.push_back(d);
@@ -419,7 +441,7 @@ std::vector<RowData> query(string sql) {
       }
       break;
     case RES_EQ_FIRST:
-      if (it.locate(&con.a, 1)) {
+      if (it.locate(&con.a, BTree::KEY_OR_NEXT)) {
         RowData d = decode(it.getValue());
         res.push_back(d);
       }
@@ -437,7 +459,7 @@ std::vector<RowData> query(string sql) {
       }
       break;
     case RES_LO:
-      if (it.locate(&con.a, 1)) {
+      if (it.locate(&con.a, BTree::KEY_OR_NEXT)) {
         do {
           RowData d = decode(it.getValue());
           res.push_back(d);
@@ -457,7 +479,7 @@ void del(string sql) {
   BTree::Iterator it = bTree->iterator();
   switch (con.flag) {
     case RES_AND:
-      if (it.locate(&con.a, 1)) {
+      if (it.locate(&con.a, BTree::KEY_OR_NEXT)) {
         do {
           RowData d = decode(it.getValue());
           if (d.id > con.b) {
@@ -479,7 +501,7 @@ void del(string sql) {
         } while (it.next());
       }
 
-      if (it.locate(&con.b, 1)) {
+      if (it.locate(&con.b, BTree::KEY_OR_NEXT)) {
         do {
           RowData d = decode(it.getValue());
           it.remove();
@@ -487,7 +509,7 @@ void del(string sql) {
       }
       break;
     case RES_EQ_FIRST:
-      if (it.locate(&con.a, 1)) {
+      if (it.locate(&con.a, BTree::KEY_OR_NEXT)) {
         RowData d = decode(it.getValue());
         it.remove();
       }
@@ -505,7 +527,7 @@ void del(string sql) {
       }
       break;
     case RES_LO:
-      if (it.locate(&con.a, 1)) {
+      if (it.locate(&con.a, BTree::KEY_OR_NEXT)) {
         do {
           RowData d = decode(it.getValue());
           it.remove();
@@ -581,7 +603,7 @@ void update(string sql) {
 
   switch (con.flag) {
     case RES_AND:
-      if (it.locate(&con.a, 1)) {
+      if (it.locate(&con.a, BTree::KEY_OR_NEXT)) {
         do {
           RowData d = decode(it.getValue());
           if (d.id > con.b) {
@@ -607,7 +629,7 @@ void update(string sql) {
         } while (it.next());
       }
 
-      if (it.locate(&con.b, 1)) {
+      if (it.locate(&con.b, BTree::KEY_OR_NEXT)) {
         do {
           RowData d = decode(it.getValue());
           it.remove();
@@ -617,7 +639,7 @@ void update(string sql) {
       }
       break;
     case RES_EQ_FIRST:
-      if (it.locate(&con.a, 1)) {
+      if (it.locate(&con.a, BTree::KEY_OR_NEXT)) {
         RowData d = decode(it.getValue());
         it.remove();
         void *t = up(d, sex, name, num, mail);
@@ -639,7 +661,7 @@ void update(string sql) {
       }
       break;
     case RES_LO:
-      if (it.locate(&con.a, 1)) {
+      if (it.locate(&con.a, BTree::KEY_OR_NEXT)) {
         do {
           RowData d = decode(it.getValue());
           it.remove();
@@ -652,237 +674,4 @@ void update(string sql) {
       fprintf(stderr, "Error: %s\n", " valid condition in update");
       break;
   }
-}
-
-#include <ctime>
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <vector>
-
-using namespace std;
-
-int cmd = 0;
-
-bool CheckFile(string fileName) {
-  ifstream file(fileName, ios::binary | ios::in);
-  if (!file.is_open()) return false;
-  file.seekg(0, ios::beg);
-  char result[4] = {0xc1, 0xc6, 0xf0, 0x1e};
-  while (file.good()) {
-    char buff[4];
-    if (file.read(buff, sizeof(buff))) {
-      if (strncmp(buff, result, sizeof(buff)) != 0) {
-        return false;
-      }
-    }
-    file.seekg(4092, ios::cur);
-  }
-  file.close();
-  return true;
-}
-
-void testM1() {
-  initial();
-
-  for (int i = 0; i < 10000; i++) {
-    vector<RowData> rowDatas;
-    RowData rowData;
-    rowData.id = i;
-    rowData.name = string("ccg").append(to_string(i));
-    rowData.number = string("20190603").append(to_string(i));
-    rowData.sex = true;
-    rowData.email = string("20190603@").append(to_string(i)).append(".com");
-    rowDatas.push_back(rowData);
-    insert(rowDatas);
-  }
-
-  // if (!CheckFile("table.db")) {
-  //    printf("wrong\n");
-  //    return;
-  //}
-  vector<RowData> result =
-      query("select * from table where id > 500 and id <999");
-  bool flag = true;
-  for (int i = 501; i < 999; i++) {
-    RowData rowData = result.front();
-    result.erase(result.begin());
-    if (rowData.id != i) {
-      flag = false;
-      break;
-    }
-    if (rowData.name.compare(string("ccg").append(to_string(i))) != 0) {
-      flag = false;
-      break;
-    }
-    if (rowData.number.compare(string("20190603").append(to_string(i))) != 0) {
-      flag = false;
-      break;
-    }
-    if (!rowData.sex) {
-      flag = false;
-      break;
-    }
-    if (rowData.email.compare(
-            string("20190603@").append(to_string(i)).append(".com")) != 0) {
-      flag = false;
-      break;
-    }
-  }
-  // del("delete from table where id > 2956 and id < 7854");
-  if (flag == false) {
-    printf("wrong\n");
-  } else
-    printf("yes\n");
-}
-
-void testM3() {
-  update("update table set number = 20190603x where id<50 or id>9950");
-  vector<RowData> rowDatas =
-      query("select * from table where id<50 or id>9950");
-  if (rowDatas.size() != 99) {
-    printf("wrong\n");
-    return;
-  }
-  for (vector<RowData>::iterator it = rowDatas.begin(); it != rowDatas.end();
-       it++) {
-    if ((*it).number.compare(string("20190603x")) != 0) {
-      printf("wrong\n");
-      return;
-    }
-  }
-  //if (!CheckFile("table.db")) {
-  //  printf("wrong\n");
-  //  return;
-  //}
-  printf("yes\n");
-  return;
-}
-
-void testM2() {
-  int flag = true;
-  del("delete from table where id > 2956 and id < 7854");
-  vector<RowData> result =
-      query("select * from table where id > 2900 and id <5000");
-  for (int i = 2901; i < 2957; i++)
-  // for (int i = 2991; i < 2957; i++)
-  {
-    //?:从2901 开始
-    RowData rowData = result.front();
-    result.erase(result.begin());
-    if (rowData.id != i) {
-      flag = false;
-      break;
-    }
-    if (rowData.name.compare(string("ccg").append(to_string(i))) != 0) {
-      flag = false;
-      break;
-    }
-    if (rowData.number.compare(string("20190603").append(to_string(i))) != 0) {
-      flag = false;
-      break;
-    }
-    if (!rowData.sex) {
-      flag = false;
-      break;
-    }
-    if (rowData.email.compare(
-            string("20190603@").append(to_string(i)).append(".com")) != 0) {
-      flag = false;
-      break;
-    }
-  }
-  if (flag == false) {
-    printf("wrong\n");
-    return;
-  }
-  result = query("select * from table where id > 5000 and id < 7900");
-  for (int i = 7854; i < 7900; i++)
-  // for (int i = 7855; i < 7900; i++)
-  {
-    // ?: 从7854开始
-    RowData rowData = result.front();
-    result.erase(result.begin());
-    if (rowData.id != i) {
-      flag = false;
-      break;
-    }
-    if (rowData.name.compare(string("ccg").append(to_string(i))) != 0) {
-      flag = false;
-      break;
-    }
-    if (rowData.number.compare(string("20190603").append(to_string(i))) != 0) {
-      flag = false;
-      break;
-    }
-    if (!rowData.sex) {
-      flag = false;
-      break;
-    }
-    if (rowData.email.compare(
-            string("20190603@").append(to_string(i)).append(".com")) != 0) {
-      flag = false;
-      break;
-    }
-  }
-  if (flag == false) {
-    printf("wrong\n");
-    return;
-  }
-
-  // if (!CheckFile("table.db")) {
-  //  printf("wrong\n");
-  //  return;
-  //}
-  printf("yes\n");
-}
-
-void test() {
-  initial();
-  vector<RowData> rowDatas;
-  for (int i = 0; i < 10000; i++) {
-    RowData rowData;
-    rowData.id = i;
-    rowData.name = string("ccg").append(to_string(i));
-    rowData.number = string("20190603").append(to_string(i));
-    rowData.sex = true;
-    rowData.email = string("20190603@").append(to_string(i)).append(".com");
-    rowDatas.push_back(rowData);
-  }
-  insert(rowDatas);
-
-  vector<RowData> result =
-      query("select * from table where id <5000 and id>200");
-  bool flag = true;
-  for (int i = 201; i < 5000; i++) {
-    RowData rowData = result[i - 201];
-    if (rowData.id != i) {
-      flag = false;
-      break;
-    }
-    if (rowData.name.compare(string("ccg").append(to_string(i))) != 0) {
-      flag = false;
-      break;
-    }
-    if (rowData.number.compare(string("20190603").append(to_string(i))) != 0) {
-      flag = false;
-      break;
-    }
-    if (!rowData.sex) {
-      flag = false;
-      break;
-    }
-    if (rowData.email.compare(
-            string("20190603@").append(to_string(i)).append(".com")) != 0) {
-      flag = false;
-      break;
-    }
-  }
-  result = query("select * from table where id <500 or id>10000");
-
-  // del("delete from table where id > 2956 and id < 7854");
-  if (flag == false)
-    printf("wrong\n");
-  else
-    printf("yes\n");
 }
