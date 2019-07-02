@@ -9,7 +9,6 @@ import inspect
 def line():
     return inspect.currentframe().f_back.f_lineno
 
-
 def log(func):
     @functools.wraps(func)
     def wrapper(*args, **kw):
@@ -71,12 +70,9 @@ def create(con: pymysql.Connection):
 def insert(con: pymysql.Connection, data: list):
     cur = con.cursor()
     try:
-        # cur.executemany('insert into user values (%s, %s, "%s")', data)
-        # # cur.executemany('insert into user values (%s, %s, "%s")', data)
         for u in data:
             cur.execute('insert into user value (%s, %s, "%s")' % u)
             assert 1 == cur.rowcount, 'insert error'
-        #
     except Exception as e:
         print('insert error: ', e)
     finally:
@@ -91,13 +87,19 @@ def query(con: pymysql.Connection, data: list):
         cur.execute('select * from user')
         rows = cur.fetchall()
         rows = [i for i in rows]
-        rows.sort()
+        # rows.sort()
         print("query rows len: %d" % len(rows))
         assert rows == data, 'query error: the result of query is not equal to the data inserted'
     except Exception as e:
         print('query error: ', e)
     finally:
         cur.close()
+
+
+def cmp_age(a, b):
+    if a[1] == b[1]:
+        return a[0]-b[0]
+    return a[1]-b[1]
 
 
 @log
@@ -107,6 +109,7 @@ def condition_query(con: pymysql.Connection, data: list):
     data.sort()
     # id 0 ~ 10 * len(data)
     # start id
+    print('condition: id')
     # start id >
     for _ in range(test_cnt_each_case):
         a = random.randint(0, 10*len(data))
@@ -164,12 +167,8 @@ def condition_query(con: pymysql.Connection, data: list):
             print('error: ', e)
     # end id <= order by id desc
     # end id
-    print('condition: age')
 
-    def cmp_age(a, b):
-        if a[1] == b[1]:
-            return a[0]-b[0]
-        return a[1]-b[1]
+    print('condition: age')
     # start age
     # start age >
     for _ in range(test_cnt_each_case):
@@ -241,8 +240,8 @@ def condition_query(con: pymysql.Connection, data: list):
 def update(con: pymysql.Connection, data: list):
     test_cnt_each_case = 2
     cur = con.cursor()
-    # update name
-    print('update by id')
+    # update name by id
+    print('update name by id')
     for _ in range(test_cnt_each_case):
         id_ = random.randint(0, 10*len(data))
         name = random_string(20)
@@ -253,18 +252,16 @@ def update(con: pymysql.Connection, data: list):
             res = cur.fetchall()
             res = [i for i in res]
             expect_res = [(i[0], i[1], name) for i in data if i[0] > id_]
+            # update data
+            data = [i for i in data if i[0] <= id_]
+            data = data+expect_res
+            data.sort()
             assert res == expect_res, 'the result of query is not expected %s' % line()
         except Exception as e:
             print('error: ', e)
 
-    cur.execute('select * from user')
-    data = cur.fetchall()
-    data = [i for i in data]
-    data.sort()
-
-    print('update by age')
-
-   # update age
+   # update age by id
+    print('update age by  id')
     for _ in range(test_cnt_each_case):
         id_ = random.randint(0, 10*len(data))
         age = random.randint(0, 99)
@@ -275,14 +272,13 @@ def update(con: pymysql.Connection, data: list):
             res = cur.fetchall()
             res = [i for i in res]
             expect_res = [(i[0], age, i[2]) for i in data if i[0] > id_]
-
+            # update data
+            data = [i for i in data if i[0] <= id_]
+            data += expect_res
+            data.sort()
             assert res == expect_res, 'the result of query is not expected %s' % line()
         except Exception as e:
             print('error: ', e)
-
-    cur.execute('select * from user')
-    data = cur.fetchall()
-    data = [i for i in data]
 
     # update name by age
     for _ in range(test_cnt_each_case):
@@ -295,43 +291,62 @@ def update(con: pymysql.Connection, data: list):
             res = cur.fetchall()
             res = [i for i in res]
             expect_res = [(i[0], i[1], name) for i in data if i[1] < age]
-            res.sort()
-            expect_res.sort()
+            expect_res.sort(key=functools.cmp_to_key(cmp_age))
+            # update data
+            data = [i for i in data if i[1] >= age]
+            data = data+expect_res
+            data.sort()
             assert res == expect_res, 'the result of query is not expected %s' % line()
         except Exception as e:
             print('error: ', e)
     cur.close()
+    return data
 
 
 @log
 def delete(con: pymysql.Connection, data: list):
     cur = con.cursor()
-    cur.execute('select * from user')
-    data = cur.fetchall()
-    data = [i for i in data]
     # delete by age
     age = 80
-    cur.execute('delete from user where age > %s ' % age)
-    cur.execute('select * from user')
-    res = cur.fetchall()
-    res = [i for i in res]
-    data.sort()
-    data = [i for i in data if i[1] <= age]
-    assert data == res, 'the result of query is not expected %s' % line()
-
-    # delete by id
-    for _ in range(5):
-        id_ = random.randint(0, 10*len(data))
-        cur.execute('delete from user where id < %s ' % id_)
+    try:
+        cur.execute('delete from user where age > %s ' % age)
         cur.execute('select * from user')
         res = cur.fetchall()
         res = [i for i in res]
-        data = [i for i in data if i[0] >= id_]
+        data.sort()
+        data = [i for i in data if i[1] <= age]
         assert data == res, 'the result of query is not expected %s' % line()
+    except Exception as e:
+        print('delete error:', e)
+    # delete by id
+    try:
+        for _ in range(5):
+            id_ = random.randint(0, 10*len(data))
+            cur.execute('delete from user where id < %s ' % id_)
+            cur.execute('select * from user')
+            res = cur.fetchall()
+            res = [i for i in res]
+            data = [i for i in data if i[0] >= id_]
+            assert data == res, 'the result of query is not expected %s' % line()
+    except Exception as e:
+        print('delete error', e)
+    
+    try:
+        for _ in range(5):
+            id_ = random.randint(0, 10*len(data))
+            cur.execute('delete from user where id = %s ' % id_)
+            cur.execute('select * from user')
+            res = cur.fetchall()
+            res = [i for i in res]
+            data = [i for i in data if i[0] != id_]
+            assert data == res, 'the result of query is not expected %s' % line()
+    except Exception as e:
+        print('delete error', e)
+    cur.close()
+    return data
 
 
 if __name__ == "__main__":
-    engine = 'InnoDB'
     con = connect()
     data_len = 20000
     create(con)
@@ -339,6 +354,8 @@ if __name__ == "__main__":
     insert(con, data)
     query(con, data)
     condition_query(con, data)
-    update(con, data)
-    delete(con, data)
+    data = update(con, data)
+    data = delete(con, data)
+    query(con, data)
+    condition_query(con, data)
     con.close()

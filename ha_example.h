@@ -35,7 +35,7 @@
 #include "my_base.h"   /* ha_rows */
 #include "my_global.h" /* ulonglong */
 #include "thr_lock.h"  /* THR_LOCK, THR_LOCK_DATA */
-#include "../db/lib/btree.h"
+#include "lib/btree.h"
 
   /** @brief
     Example_share is a class that will be shared among all open handlers.
