@@ -7,7 +7,8 @@
 // @email yangtaojay@gmail.com
 //
 
-#pragma once
+#ifndef _BTREE_FILE_H
+#define _BTREE_FILE_H
 
 #include "block.h"
 #include <Windows.h>
@@ -47,3 +48,5 @@ public:
 
   int resize(u32 numberOfBlock, u32 blockSize);
 };
+
+#endif _BTREE_FILE_H

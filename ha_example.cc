@@ -195,6 +195,8 @@ const char **ha_example::bas_ext() const
 
 static int max(int a, int b) { return a > b ? a : b; }
 
+
+
 static int primary_key_compare(const void *a, const void *b, void *p) {
     TABLE_SHARE *share = (TABLE_SHARE *)p;
     KEY *key_info = &share->key_info[0];
@@ -285,15 +287,51 @@ static int second_key_compare(const void *a, const void *b, void *p) {
  * padding = max_second_key_length - this_key_length
  *
  */
+void key_copy(uchar *to_key, const uchar *from_record, KEY *key_info) {
+    uint length;
+    KEY_PART_INFO *key_part;
+
+    uint key_length = key_info->key_length;
+    for (key_part = key_info->key_part; (int)key_length > 0; key_part++)
+    {
+        if (key_part->null_bit)
+        {
+            *to_key++ = MY_TEST(from_record[key_part->null_offset] &
+                key_part->null_bit);
+            key_length--;
+        }
+        if (key_part->key_part_flag & HA_BLOB_PART ||
+            key_part->key_part_flag & HA_VAR_LENGTH_PART)
+        {
+            key_length -= HA_KEY_BLOB_LENGTH;
+            length = key_length < key_part->length ? key_length : key_part->length;
+            memcpy(to_key, from_record + key_part->offset, length);
+            to_key += HA_KEY_BLOB_LENGTH;
+        }
+        else
+        {
+            length = key_length < key_part->length ? key_length : key_part->length;
+            memcpy(to_key, from_record + key_part->offset, length);
+        }
+        to_key += length;
+        key_length -= length;
+    }
+}
+
 void ha_example::pack_key(uchar *key, int key_num, const uchar *record) {
     memset(key, 0, primary_key_length + max_second_key_length + 1);
     if (key_num != 0) {
         *key++ = key_num;
-        key_copy(key, const_cast<uchar *>(record), &table->key_info[key_num], 0);
+        KEY *k = &table->key_info[key_num];
+        key_copy(key, record, k);
+        //key_copy(key, const_cast<uchar *>(record), k, 0);
         key += table->key_info[key_num].key_length;
+
     }
+
     // primary key
-    key_copy(key, const_cast<uchar *>(record), &table->key_info[0], 0);
+    //key_copy(key, const_cast<uchar *>(record), &table->key_info[0], 0);
+    key_copy(key, record, &table->key_info[0]);
 }
 
 int ha_example::pack_row(u8 *buf) {
@@ -319,7 +357,7 @@ int ha_example::pack_row(u8 *buf) {
     to += table->s->null_bytes;
     for (Field **field = table->field; *field; field++) {
         if (!(*field)->is_null()) {
-            uint off = (*field)->offset(table->record[0]);
+            uint off = (*field)->offset(buf);
             to = (*field)->pack(to, buf + off);
         }
     }
@@ -328,13 +366,12 @@ int ha_example::pack_row(u8 *buf) {
 }
 
 int ha_example::unpack_row(const void *from, u8 *to) {
-
     memcpy(to, from, table->s->null_bytes);
     u8 *p = (u8 *)from + table->s->null_bytes;
     for (Field **field = table->field; *field; field++) {
         if (!(*field)->is_null()) {
             const uchar *q =
-                (*field)->unpack(to + (*field)->offset(table->record[0]), p);
+                (*field)->unpack(to + (*field)->offset(to), p);
             p += q - p;
         }
     }
@@ -579,8 +616,8 @@ int ha_example::write_row(uchar *buf)
         if (s_btree->put(key_buffer, NULL, 0) != 1)
             DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
     }
-    p_btree->save();
-    s_btree->save();
+    /*p_btree->save();
+    s_btree->save();*/
     DBUG_RETURN(0);
 }
 
@@ -614,7 +651,9 @@ int ha_example::update_row(const uchar *old_data, uchar *new_data)
     DBUG_ENTER("ha_example::update_row");
     if (table->next_number_field && new_data == table->record[0])
         update_auto_increment();
+
     int rc = delete_row(old_data);
+
     if (rc != 0)
         DBUG_RETURN(rc);
     DBUG_RETURN(write_row(new_data));
@@ -646,19 +685,25 @@ int ha_example::delete_row(const uchar *buf)
     DBUG_ENTER("ha_example::delete_row");
     pack_key(ref, 0, buf);
 
-    if (!primary_it.locate(ref, BTree::EXACT_KEY)) {
+    BTree::Iterator it = p_btree->iterator();
+
+    if (!it.locate(ref, BTree::EXACT_KEY)) {
         DBUG_RETURN(HA_ERR_KEY_NOT_FOUND);
     }
-    primary_it.remove();
+    it.remove();
+
+    it.setBTree(s_btree);
 
     for (int idx = 1; idx < table->s->keys; idx++) {
         pack_key(key_buffer, idx, buf);
-        if (!sec_it.locate(key_buffer, BTree::EXACT_KEY))
+        if (!it.locate(key_buffer, BTree::EXACT_KEY)) {
             DBUG_RETURN(HA_ERR_KEY_NOT_FOUND);
-        sec_it.remove();
+            //exit(-1);
+        }
+        it.remove();
     }
-    p_btree->save();
-    s_btree->save();
+    /*p_btree->save();
+    s_btree->save();*/
     DBUG_RETURN(0);
 }
 

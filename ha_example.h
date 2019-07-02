@@ -35,7 +35,7 @@
 #include "my_base.h"   /* ha_rows */
 #include "my_global.h" /* ulonglong */
 #include "thr_lock.h"  /* THR_LOCK, THR_LOCK_DATA */
-#include "../../db/Project/btree.h"
+#include "../db/lib/btree.h"
 
   /** @brief
     Example_share is a class that will be shared among all open handlers.
@@ -84,10 +84,10 @@ class ha_example : public handler {
 public:
     ha_example(handlerton *hton, TABLE_SHARE *table_arg);
     ~ha_example() {
-        if (p_btree != NULL) delete p_btree;
-        if (s_btree != NULL) delete s_btree;
-        if (record_buffer != NULL) free(record_buffer);
-        if (key_buffer) free(key_buffer);
+        /*if (p_btree != NULL) { delete p_btree; p_btree = NULL; }
+        if (s_btree != NULL) { delete s_btree; s_btree = NULL; }*/
+        if (record_buffer != NULL) { free(record_buffer); record_buffer = NULL; }
+        if (key_buffer) { free(key_buffer); key_buffer = NULL; }
     }
 
     /** @brief
@@ -123,7 +123,7 @@ public:
             HA_NULL_IN_KEY |
             HA_REC_NOT_IN_SEQ |
             HA_PRIMARY_KEY_IN_READ_INDEX |
-            HA_AUTO_PART_KEY |
+            //HA_AUTO_PART_KEY |
             HA_PRIMARY_KEY_REQUIRED_FOR_DELETE |
             HA_PRIMARY_KEY_REQUIRED_FOR_POSITION//not sure
             ;

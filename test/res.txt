@@ -1,0 +1,25 @@
+# engine = InnoDB
+start executing connect()
+connect() executed for 0.013931s
+start executing create()        
+create() executed for 0.026113s
+start executing generate_data()
+generate_data() executed for 1.307748s
+start executing insert()
+insert() executed for 38.837818s
+start executing query()
+query() executed for 1.188123s
+start executing condition_query()
+condition: age
+condition_query() executed for 39.682289s
+
+# engine = example
+start executing generate_data()
+generate_data() executed for 1.289372s
+start executing insert()
+insert() executed for 19.660729s
+start executing query()
+query() executed for 1.113652s
+start executing condition_query()
+condition: age
+condition_query() executed for 25.600852s

@@ -6,67 +6,72 @@
 // @author yangtao
 // @email yangtaojay@gmail.com
 //
-
+//#define _CRTDBG_MAP_ALLOC
 #include "btree.h"
 #include <assert.h>
 #include <cstring>
+#include "debug.h"
 
 //#define BTREE_DEBUG
 
 u16 NodeBlock::size() const {
 #ifdef BTREE_DEBUG
     return 32;
-#endif // BTREE_DEBUG
-    return (BLOCK_SIZE - ((u8 *)this - (u8 *)kv)) / sizeOfItem();
+#endif  // BTREE_DEBUG
+    //return (BLOCK_SIZE - ((u8*)this - (u8*)kv)) / sizeOfItem();
+    return (BLOCK_SIZE - sizeof(NodeBlock)) / sizeOfItem();
 }
 
-int NodeBlock::find(const void *key) const {
+int NodeBlock::find(const void* key) const {
     int lo = 0;
     int hi = count;
     while (lo < hi) {
         int mid = (lo + hi) / 2;
-        void *p = (u8 *)kv + mid * sizeOfItem();
+        void* p = (u8*)kv + mid * sizeOfItem();
         int res = btree->cmp(p, key, btree->extraCmpInfo);
         if (res == 0)
             return mid;
         else if (res > 0)
-            hi = mid; // key in kv[mid] is bigger than `key`
+            hi = mid;  // key in kv[mid] is bigger than `key`
         else
             lo = mid + 1;
     }
     return -1;
 }
 
-int NodeBlock::lub(const void *key) const {
+int NodeBlock::lub(const void* key) const {
     int lo = 0;
     int hi = count;
     while (lo < hi) {
         int mid = (lo + hi) / 2;
-        void *p = (u8 *)kv + mid * sizeOfItem();
+        void* p = (u8*)kv + mid * sizeOfItem();
         int res = btree->cmp(p, key, btree->extraCmpInfo);
         if (res < 0)
-            lo = mid + 1; // key in kv[mid] is less than `key`
+            lo = mid + 1;  // key in kv[mid] is less than `key`
         else
             hi = mid;
     }
     return lo;
 }
 
-const void *NodeBlock::maxKey() const {
-    return (u8 *)kv + (count - 1) * sizeOfItem();
+const void* NodeBlock::maxKey() const {
+    return (u8*)kv + (count - 1) * sizeOfItem();
 }
 
-const void *NodeBlock::getValue(int index) const {
-    return (u8 *)kv + index * sizeOfItem() + keySize + 1;
+const void* NodeBlock::getValue(int index) const {
+    return (u8*)kv + index * sizeOfItem() + keySize + 1;
 }
 
-const void *NodeBlock::getKey(int index) const {
-    return (u8 *)kv + index * sizeOfItem();
+const void* NodeBlock::getKey(int index) const {
+    return (u8*)kv + index * sizeOfItem();
 }
 
-void NodeBlock::insert(const void *key, const void *value, u16 index) {
-    assert(index <= count);
-    u8 *p = kv + (index)*sizeOfItem();
+void NodeBlock::insert(const void* key, const void* value, u16 index) {
+    MEM_CHECK
+
+        assert(index <= count);
+    assert(count < size());
+    u8* p = kv + index * sizeOfItem();
     memmove(p + sizeOfItem(), p, sizeOfItem() * (count - index));
 
     // copy key
@@ -81,10 +86,12 @@ void NodeBlock::insert(const void *key, const void *value, u16 index) {
     memcpy(p, value, valSize);
 
     count++;
+    MEM_CHECK
 }
 
-void NodeBlock::set(u16 index, const void *key, const void *value, u8 flag) {
-    u8 *p = kv + index * sizeOfItem();
+void NodeBlock::set(u16 index, const void* key, const void* value, u8 flag) {
+    MEM_CHECK
+        u8* p = kv + index * sizeOfItem();
 
     // copy key
     if (key != NULL)
@@ -98,26 +105,31 @@ void NodeBlock::set(u16 index, const void *key, const void *value, u8 flag) {
     // value
     if (value != NULL)
         memcpy(p, value, valSize);
+    MEM_CHECK
 }
 
-void NodeBlock::split(NodeBlock *nextNode) {
+void NodeBlock::split(NodeBlock* nextNode) {
     // move kv
     // [count/2+1, count-1]
-    memcpy(nextNode->kv, kv + ((count + 1) / 2) * sizeOfItem(),
-        count / 2 * sizeOfItem());
+    MEM_CHECK
+        memcpy(nextNode->kv, kv + ((count + 1) / 2) * sizeOfItem(),
+            count / 2 * sizeOfItem());
 
     nextNode->count = count / 2;
 
     count = (count + 1) / 2;
+    MEM_CHECK
 }
 
-void NodeBlock::merge(NodeBlock *nextNode) {
-    memcpy(kv + count * sizeOfItem(), nextNode->kv,
-        nextNode->count * sizeOfItem());
+void NodeBlock::merge(NodeBlock* nextNode) {
+    MEM_CHECK
+        memcpy(kv + count * sizeOfItem(), nextNode->kv,
+            nextNode->count * sizeOfItem());
 
     count += nextNode->count;
 
     header.next = nextNode->header.next;
+    MEM_CHECK
 }
 
 void NodeBlock::remove(u16 index) {
@@ -128,24 +140,26 @@ void NodeBlock::remove(u16 index) {
 }
 
 bool NodeBlock::removed(u16 index) const {
-    u8 *p = (u8 *)kv + index * sizeOfItem() + keySize;
+    u8* p = (u8*)kv + index * sizeOfItem() + keySize;
     return *p == 0;
 }
 
-void NodeBlock::removeByFlag(u16 index) { set(index, NULL, NULL, 0); }
+void NodeBlock::removeByFlag(u16 index) {
+    set(index, NULL, NULL, 0);
+}
 
 // compare the key with `index`, and `key`
-int NodeBlock::compare(u16 index, const void *key) const {
+int NodeBlock::compare(u16 index, const void* key) const {
     return btree->cmp(this->getKey(index), key, btree->extraCmpInfo);
 }
 
-int BTree::Iterator::locate(const void *key, IterFlag flag) {
+int BTree::Iterator::locate(const void* key, IterFlag flag) {
     assert(key != NULL);
-
     cur = btree->getLeaf(key);
     index = cur->lub(key);
     if (index == cur->count) {
         // the `key` is after the last key or the tree is empty
+        if (cur->empty()) return 0;
         if (flag == 2 || flag == 4) {
             index--;
             if (cur->removed(index)) {
@@ -161,22 +175,22 @@ int BTree::Iterator::locate(const void *key, IterFlag flag) {
     }
     int res = compare(key);
     switch (flag) {
-    case 0: // exact the key
+    case 0:  // exact the key
         if (res == 0 && !cur->removed(index))
             return 1;
         else
             return 0;
-    case 1: // the key or next
+    case 1:  // the key or next
         if (cur->removed(index))
             return next();
         else
             return 1;
-    case 2: // the key or prev
+    case 2:  // the key or prev
         if (res != 0 || cur->removed(index))
             return prev();
         else
             return 1;
-    case 3: // after the key
+    case 3:  // after the key
         if (res == 0 || cur->removed(index))
             return next();
         else
@@ -219,7 +233,7 @@ int BTree::Iterator::next() {
         if (cur->header.next == 0) {
             return 0;
         }
-        cur = (NodeBlock *)btree->getNodeBlock(cur->header.next);
+        cur = (NodeBlock*)btree->getNodeBlock(cur->header.next);
         index = 0;
     }
 
@@ -234,7 +248,7 @@ int BTree::Iterator::next() {
             if (cur->header.next == 0) {
                 return 0;
             }
-            cur = (NodeBlock *)btree->getNodeBlock(cur->header.next);
+            cur = (NodeBlock*)btree->getNodeBlock(cur->header.next);
             index = 0;
         }
     }
@@ -250,7 +264,7 @@ int BTree::Iterator::prev() {
         if (cur->header.last == 0) {
             return 0;
         }
-        cur = (NodeBlock *)btree->getNodeBlock(cur->header.last);
+        cur = (NodeBlock*)btree->getNodeBlock(cur->header.last);
         index = cur->count - 1;
     }
     // the key may have been removed
@@ -270,31 +284,37 @@ int BTree::Iterator::prev() {
 //    if (value != NULL) memcpy(value, cur->getValue(index), cur->valSize);
 //}
 
-void BTree::Iterator::remove() { cur->removeByFlag(index); }
+void BTree::Iterator::remove() {
+    cur->removeByFlag(index);
+}
 
-int BTree::Iterator::compare(const void *key) const {
+int BTree::Iterator::compare(const void* key) const {
     return cur->compare(index, key);
 }
 
-const void *BTree::Iterator::getKey() { return cur->getKey(index); }
+const void* BTree::Iterator::getKey() {
+    return cur->getKey(index);
+}
 
-const void *BTree::Iterator::getValue() {
+const void* BTree::Iterator::getValue() {
     if (btree->isConstValueSize) {
         return cur->getValue(index);
     }
     else {
-        Location loc = *(Location *)cur->getValue(index);
+        Location loc = *(Location*)cur->getValue(index);
         return btree->getValue(loc);
     }
 }
 
 // BTree
-BTree::BTree(u16 keySize, Compare *c, void *p, u16 valueSize)
-    : keySize(keySize), cmp(c), extraCmpInfo(p),
+BTree::BTree(u16 keySize, Compare* c, void* p, u16 valueSize)
+    : keySize(keySize),
+    cmp(c),
+    extraCmpInfo(p),
     leafValueSize(valueSize >= 256 ? sizeof(LeafValue) : valueSize),
     isConstValueSize(valueSize < 256) {}
 
-int BTree::create(const char *filename) {
+int BTree::create(const char* filename) {
     u32 numOfBlock = 32;
     MyFile file;
     if (!file.create(filename, numOfBlock, blockSize))
@@ -303,8 +323,10 @@ int BTree::create(const char *filename) {
         return 0;
 
     // root
-    NodeBlock *block = (NodeBlock*)_aligned_malloc(blockSize, blockSize);;
-    if (block == NULL) return 0;
+    NodeBlock* block = (NodeBlock*)_aligned_malloc(blockSize, blockSize);
+    ;
+    if (block == NULL)
+        return 0;
     block->init(1, BLOCK_TYPE_LEAF, keySize, leafValueSize);
     if (!file.writeBlock(block, 1, blockSize)) {
         _aligned_free(meta);
@@ -312,7 +334,7 @@ int BTree::create(const char *filename) {
     }
 
     // metadata
-    BTreeMetadata *meta = (BTreeMetadata *)block;
+    BTreeMetadata* meta = (BTreeMetadata*)block;
     meta->init(0);
     meta->countOfBlock = 2;
     meta->numberOfBlock = numOfBlock;
@@ -325,11 +347,11 @@ int BTree::create(const char *filename) {
     return 1;
 }
 
-int BTree::open(const char *filename) {
+int BTree::open(const char* filename) {
     if (!file.open(filename))
         return 0;
     buffer = new BufferManager(&file, blockSize);
-    meta = (BTreeMetadata *)buffer->getBlock(0);
+    meta = (BTreeMetadata*)buffer->getBlock(0);
     if (meta == NULL) {
         delete buffer;
         return 0;
@@ -345,58 +367,58 @@ int BTree::open(const char *filename) {
 }
 
 // locate the position the `key` should insert
-NodeBlock *BTree::getLeaf(const void *key) {
+NodeBlock* BTree::getLeaf(const void* key) {
     int index = root->lub(key);
     if (root->leaf())
         return root;
 
     if (index == root->count)
         index--;
-    NodeBlock *node = getNodeBlock(*(u32 *)(root->getValue(index)));
+    NodeBlock* node = getNodeBlock(*(u32*)(root->getValue(index)));
 
     while (!node->leaf()) {
         int index = node->lub(key);
         if (index == node->count)
             index--;
 
-        node = getNodeBlock(*(u32 *)(node->getValue(index)));
+        node = getNodeBlock(*(u32*)(node->getValue(index)));
     }
     return node;
 }
 
-NodeBlock *BTree::getFirstLeaf() {
+NodeBlock* BTree::getFirstLeaf() {
     if (root->leaf())
         return root;
-    NodeBlock *node = getNodeBlock(*(u32 *)root->getValue(0));
+    NodeBlock* node = getNodeBlock(*(u32*)root->getValue(0));
     while (!node->leaf()) {
-        node = getNodeBlock(*(u32 *)node->getValue(0));
+        node = getNodeBlock(*(u32*)node->getValue(0));
     }
     return node;
 }
 
-NodeBlock *BTree::getLastLeaf() {
-    NodeBlock *node = root;
+NodeBlock* BTree::getLastLeaf() {
+    NodeBlock* node = root;
     while (!node->leaf()) {
-        node = getNodeBlock(*(u32 *)node->getValue(node->count - 1));
+        node = getNodeBlock(*(u32*)node->getValue(node->count - 1));
     }
     return node;
 }
 
-NodeBlock *BTree::getNodeBlock(u32 index) {
+NodeBlock* BTree::getNodeBlock(u32 index) {
     assert(index < meta->countOfBlock);
-    NodeBlock *block = (NodeBlock *)buffer->getBlock(index);
+    NodeBlock* block = (NodeBlock*)buffer->getBlock(index);
     if (block != NULL)
         block->setBTree(this);
     return block;
 }
 
-NodeBlock *BTree::getFreeNodeBlock(u16 type, u16 keySize, u16 valueSize) {
+NodeBlock* BTree::getFreeNodeBlock(u16 type, u16 keySize, u16 valueSize) {
     if (meta->numberOfBlock == meta->countOfBlock) {
         // resize file
         meta->numberOfBlock *= 2;
         file.resize(meta->numberOfBlock, blockSize);
     }
-    NodeBlock *block = (NodeBlock *)buffer->getBlock(meta->countOfBlock);
+    NodeBlock* block = (NodeBlock*)buffer->getBlock(meta->countOfBlock);
     // TODO:test
     assert(block->header.reserved == 1);
     if (block != NULL) {
@@ -406,13 +428,13 @@ NodeBlock *BTree::getFreeNodeBlock(u16 type, u16 keySize, u16 valueSize) {
     return block;
 }
 
-DataBlock *BTree::getFreeDataBlock() {
+DataBlock* BTree::getFreeDataBlock() {
     if (meta->numberOfBlock == meta->countOfBlock) {
         // resize file
         meta->numberOfBlock *= 2;
         file.resize(meta->numberOfBlock, blockSize);
     }
-    DataBlock *block = (DataBlock *)buffer->getBlock(meta->countOfBlock);
+    DataBlock* block = (DataBlock*)buffer->getBlock(meta->countOfBlock);
     if (block != NULL) {
         block->init(meta->countOfBlock);
         meta->countOfBlock++;
@@ -422,20 +444,22 @@ DataBlock *BTree::getFreeDataBlock() {
 
 // value will be stored in data block
 // if `index` is bigger than meta->countOfBlock, insert into a new block.
-int BTree::insertValue(u32 index, const void *value, u32 valueSize,
-    Location *loc) {
-    DataBlock *block = NULL;
+int BTree::insertValue(u32 index,
+    const void* value,
+    u32 valueSize,
+    Location* loc) {
+    DataBlock* block = NULL;
     assert(index <= meta->countOfBlock);
 
     if (index == meta->countOfBlock)
         block = getFreeDataBlock();
     else
-        block = (DataBlock *)buffer->getBlock(index);
+        block = (DataBlock*)buffer->getBlock(index);
 
     if (block == NULL)
         return 0;
 
-    if (block->freeSize() <= valueSize) {
+    if (block->freeSize() <= (int)valueSize) {
         //        buffer->releaseBlock(index);
         if (block->header.next != 0) {
             // insert into the next block
@@ -455,12 +479,12 @@ int BTree::insertValue(u32 index, const void *value, u32 valueSize,
 }
 
 // copy the value to the buf
-const void *BTree::getValue(BTree::Location loc) {
+const void* BTree::getValue(BTree::Location loc) {
     assert(loc.index < meta->countOfBlock);
-    DataBlock *block = (DataBlock *)buffer->getBlock(loc.index, 0);
+    DataBlock* block = (DataBlock*)buffer->getBlock(loc.index, 0);
     if (block == NULL)
         return NULL;
-    const void *p = block->get(loc.position);
+    const void* p = block->get(loc.position);
 
     // buffer->releaseBlock(loc.index);
     return p;
@@ -468,26 +492,28 @@ const void *BTree::getValue(BTree::Location loc) {
 
 /// @return 0  duplicate key
 ///         -1 error
-int BTree::insert(const void *key, const void *value, u32 valueSize,
-    NodeBlock *cur) {
+int BTree::insert(const void* key,
+    const void* value,
+    u32 valueSize,
+    NodeBlock* cur) {
     int index = cur->lub(key);
     if (cur->leaf()) {
         // repetition key
         if (index < cur->count && cur->compare(index, key) == 0) {
             if (cur->removed(index)) {
                 if (isConstValueSize) {
-                    cur->set(index, NULL, value);
+                    cur->set(index, NULL, value, 1);
                 }
                 else {
-                    Location loc = *(Location *)cur->getValue(index);
+                    Location loc = *(Location*)cur->getValue(index);
                     if (!insertValue(loc.index, value, valueSize, &loc)) {
                         return -1;
                     }
-                    cur->set(index, NULL, &loc);
+                    cur->set(index, NULL, &loc, 1);
                 }
             }
             else {
-                return 0; // duplicate key
+                return 0;  // duplicate key
             }
         }
         else {
@@ -497,9 +523,10 @@ int BTree::insert(const void *key, const void *value, u32 valueSize,
             else {
                 Location loc;
                 if (!cur->empty())
-                    loc = *(Location *)cur->getValue(index - (index == cur->count ? 1 : 0));
+                    loc = *(Location*)cur->getValue(
+                        index - (index == cur->count ? 1 : 0));
                 else
-                    loc.index = meta->countOfBlock; // insert into new block
+                    loc.index = meta->countOfBlock;  // insert into new block
 
                 if (!insertValue(loc.index, value, valueSize, &loc)) {
                     return -1;
@@ -519,7 +546,7 @@ int BTree::insert(const void *key, const void *value, u32 valueSize,
     }
 
     // get son
-    NodeBlock *son = getNodeBlock(*(u32 *)cur->getValue(index));
+    NodeBlock* son = getNodeBlock(*(u32*)cur->getValue(index));
 
     // insert into son
     int res = insert(key, value, valueSize, son);
@@ -533,12 +560,12 @@ int BTree::insert(const void *key, const void *value, u32 valueSize,
 
     // split son
     if (son->full()) {
-        NodeBlock *next = (NodeBlock *)getFreeNodeBlock(son->header.type,
-            son->keySize, son->valSize);
+        NodeBlock* next = (NodeBlock*)getFreeNodeBlock(
+            son->header.type, son->keySize, son->valSize);
         son->split(next);
 
         if (son->header.next != 0) {
-            NodeBlock *oldnext = getNodeBlock(son->header.next);
+            NodeBlock* oldnext = getNodeBlock(son->header.next);
             oldnext->header.last = next->header.index;
             next->header.next = son->header.next;
         }
@@ -558,7 +585,7 @@ int BTree::insert(const void *key, const void *value, u32 valueSize,
     return 1;
 }
 
-int BTree::put(const void *key, const void *value, u32 valueSize) {
+int BTree::put(const void* key, const void* value, u32 valueSize) {
     int res = insert(key, value, valueSize, root);
     if (res != 1)
         return res;
@@ -566,14 +593,14 @@ int BTree::put(const void *key, const void *value, u32 valueSize) {
 
     // split root
     if (root->full()) {
-        NodeBlock *newRoot = (NodeBlock *)getFreeNodeBlock(
-            BLOCK_TYPE_NODE, keySize, nodeValueSize); // new root
-        NodeBlock *nextNode =
-            (NodeBlock *)getFreeNodeBlock(root->header.type, keySize,
-                root->valSize); // next node of old root
+        NodeBlock* newRoot = (NodeBlock*)getFreeNodeBlock(
+            BLOCK_TYPE_NODE, keySize, nodeValueSize);  // new root
+        NodeBlock* nextNode = (NodeBlock*)getFreeNodeBlock(
+            root->header.type, keySize,
+            root->valSize);  // next node of old root
 
-// the max key of current root is the max key of the next node after
-// splitting.
+        // the max key of current root is the max key of the next node after
+        // splitting.
         newRoot->set(1, root->maxKey(), &nextNode->header.index);
 
         // split

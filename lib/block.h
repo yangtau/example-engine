@@ -6,7 +6,8 @@
 // @author yangtao
 // @email yangtaojay@gmail.com
 
-#pragma once
+#ifndef _BTREE_BLOCK_H
+#define _BTREE_BLOCK_H
 
 #include "common.h"
 #include <inttypes.h>
@@ -78,3 +79,5 @@ struct DataBlock {
 };
 
 #pragma pack()
+
+#endif //_BTREE_BLOCK_H
